@@ -215,6 +215,9 @@ const CoachesPage: React.FC = () => {
           rows={coaches}
           columns={columns}
         >
+          <EditingState 
+            onCommitChanges={() => {}}
+          />
           <SortingState
             defaultSorting={[{ columnName: 'id', direction: 'asc' }]}
           />
