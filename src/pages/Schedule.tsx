@@ -107,25 +107,25 @@ const SchedulePage: React.FC = () => {
   // Get class name by ID
   const getClassName = (classId?: number): string => {
     if (classId === undefined || classId === null) return 'Unknown Class';
-    const classItem = classes.find(c => c.id === classId);
+    const classItem = classes ? classes.find(c => c && c.id === classId) : undefined;
     return classItem ? classItem.name : 'Unknown Class';
   };
 
   // Get coach name by class ID
   const getCoachName = (classId?: number): string => {
     if (classId === undefined || classId === null) return 'Unknown Coach';
-    const classItem = classes.find(c => c.id === classId);
+    const classItem = classes ? classes.find(c => c && c.id === classId) : undefined;
     if (!classItem) return 'Unknown Coach';
 
-    const coach = coaches.find(t => t.id === classItem.coachId);
-    return coach ? `${coach.firstName} ${coach.lastName}` : 'Unknown Coach';
+    const coach = coaches && classItem.coachId ? coaches.find(t => t && t.id === classItem.coachId) : undefined;
+    return coach ? `${coach.firstName || ''} ${coach.lastName || ''}`.trim() : 'Unknown Coach';
   };
 
   // Get coach ID by class ID
   const getCoachId = (classId?: number): number | undefined => {
     if (classId === undefined || classId === null) return undefined;
-    const classItem = classes.find(c => c.id === classId);
-    return classItem ? classItem.coachId : undefined;
+    const classItem = classes ? classes.find(c => c && c.id === classId) : undefined;
+    return classItem && classItem.coachId ? classItem.coachId : undefined;
   };
 
   // Handling scheduler views
@@ -533,12 +533,12 @@ const SchedulePage: React.FC = () => {
           classId: schedule.classId,
           startDate: schedule.startDate ? new Date(schedule.startDate) : new Date(),
           endDate: schedule.endDate ? new Date(schedule.endDate) : new Date(),
-          title: schedule.title || getClassName(schedule.classId),
+          title: schedule.title || getClassName(schedule.classId) || 'Untitled Class',
           notes: schedule.notes || '',
           rRule: schedule.rRule || undefined,
           exDate: schedule.exDate || undefined,
           // Add coach ID for grouping
-          coachId: coachId
+          coachId: coachId || 0 // Default to 0 if no coach is found
         };
       } catch (error) {
         console.error('Error converting schedule to appointment:', error, schedule);
@@ -552,10 +552,12 @@ const SchedulePage: React.FC = () => {
   const resources = [{
     fieldName: 'coachId',
     title: 'Coach',
-    instances: coaches.map(coach => ({
-      id: coach.id,
-      text: `${coach.firstName} ${coach.lastName}`
-    })),
+    instances: coaches && coaches.length > 0 
+      ? coaches.map(coach => ({
+          id: coach.id,
+          text: coach ? `${coach.firstName || ''} ${coach.lastName || ''}`.trim() : 'Unknown Coach'
+        }))
+      : [{ id: 0, text: 'No Coaches Available' }],
     allowMultiple: false,
   }];
 
@@ -604,6 +606,11 @@ const SchedulePage: React.FC = () => {
           />
           <IntegratedEditing />
           
+          {/* Resources must come before GroupingState and IntegratedGrouping */}
+          <Resources
+            data={resources}
+          />
+          
           {groupByCoach && (
             <>
               <GroupingState
@@ -623,10 +630,6 @@ const SchedulePage: React.FC = () => {
           <ViewSwitcher />
           
           <Appointments appointmentComponent={Appointment} />
-          
-          <Resources
-            data={resources}
-          />
           
           {groupByCoach && (
             <GroupingPanel />
