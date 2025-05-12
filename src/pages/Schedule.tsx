@@ -425,14 +425,18 @@ const SchedulePage: React.FC = () => {
 
   // Convert schedules to appointments format
   const appointments = schedules
+    // Filter out null or undefined schedules
     .filter(schedule => schedule !== null && schedule !== undefined)
+    // Map schedules to appointment format with better error handling
     .map(schedule => {
+      // Check if schedule is a valid object and has the required properties
       if (!schedule || typeof schedule !== 'object' || schedule.classId === undefined) {
         console.warn('Invalid schedule data found:', schedule);
         return null;
       }
       
       try {
+        // Create appointment with safe access to properties, providing fallbacks
         return {
           id: schedule.id,
           classId: schedule.classId,
@@ -448,6 +452,7 @@ const SchedulePage: React.FC = () => {
         return null;
       }
     })
+    // Filter out any null appointments that resulted from errors
     .filter(Boolean) as AppointmentModel[];
 
   if (loading) {
