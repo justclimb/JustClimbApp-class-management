@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Paper, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid, Chip } from '@mui/material';
+import { Typography, Paper, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid, Chip, IconButton } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import {
   Grid as DataGrid,
@@ -228,13 +228,13 @@ const CoachesPage: React.FC = () => {
           <TableEditColumn
             showEditCommand
             showDeleteCommand
-            commandComponent={({ id, executeCommand }) => {
+            commandComponent={({ id, onExecute }) => {
               const handleClick = () => {
                 if (id === 'edit') {
-                  const rowId = executeCommand.args[0];
+                  const rowId = onExecute() as any;
                   handleEditCoach(rowId);
                 } else if (id === 'delete') {
-                  const rowId = executeCommand.args[0];
+                  const rowId = onExecute() as any;
                   handleDeleteCoach(rowId);
                 }
               };
