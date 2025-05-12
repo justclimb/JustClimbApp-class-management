@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Paper, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Grid } from '@mui/material';
+import { Typography, Paper, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Grid, Chip, Divider, FormControl, RadioGroup, FormControlLabel, Radio } from '@mui/material';
 import {
   Scheduler,
   WeekView,
@@ -29,6 +29,14 @@ import DeleteIcon from '@mui/icons-material/Delete';
 // Add exDate property to ClassSchedule for handling recurring exceptions
 interface ExtendedClassSchedule extends ClassSchedule {
   exDate?: string;
+  // Recurrence form properties
+  recurrenceType?: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+  interval?: number;
+  selectedDays?: string[];
+  monthDay?: number;
+  endType?: 'never' | 'count' | 'until';
+  endCount?: number;
+  endDate: Date;
 }
 
 const SchedulePage: React.FC = () => {
@@ -43,6 +51,8 @@ const SchedulePage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<Partial<ExtendedClassSchedule>>({});
   const [isNew, setIsNew] = useState(true);
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -331,33 +341,41 @@ const SchedulePage: React.FC = () => {
   // Handle form submission
   const handleFormSubmit = async () => {
     try {
-      // Validate required fields
-      if (!formData.classId || !formData.startDate || !formData.endDate) {
-        alert('Please fill in all required fields');
+      setFormSubmitting(true);
+
+      // Validate form data
+      if (!formData.title || !formData.startDate || !formData.endDate || !formData.classId) {
+        setFormError('Please fill in all required fields');
+        setFormSubmitting(false);
         return;
       }
 
-      // Ensure the rRule is in valid iCalendar format if provided
-      if (formData.rRule && !formData.rRule.startsWith('FREQ=')) {
-        alert('Recurrence rule must be in iCalendar RRULE format (e.g., FREQ=WEEKLY;BYDAY=MO,WE,FR)');
-        return;
-      }
+      // Make sure we always have a valid endDate
+      const endDate = formData.endDate || new Date();
 
       if (isNew) {
         // Create new schedule
-        const newSchedule = await schedulesApi.create(formData as Omit<ExtendedClassSchedule, 'id'>);
+        const newSchedule = await schedulesApi.create({
+          ...formData,
+          endDate, // Use the validated endDate
+        } as Omit<ExtendedClassSchedule, 'id'>);
         setSchedules([...schedules, newSchedule]);
       } else {
         // Update existing schedule
-        const updatedSchedule = await schedulesApi.update(formData.id!, formData);
+        const updatedSchedule = await schedulesApi.update(formData.id!, {
+          ...formData,
+          endDate, // Use the validated endDate
+        } as Omit<ExtendedClassSchedule, 'id'>);
         if (updatedSchedule) {
           setSchedules(schedules.map(s => s.id === updatedSchedule.id ? updatedSchedule : s));
         }
       }
       setShowForm(false);
     } catch (error) {
-      console.error('Error saving schedule:', error);
-      alert('Error saving the schedule');
+      console.error('Error submitting form:', error);
+      setFormError('An error occurred while saving the schedule');
+    } finally {
+      setFormSubmitting(false);
     }
   };
 
@@ -578,45 +596,312 @@ const SchedulePage: React.FC = () => {
               <Typography variant="subtitle1" gutterBottom component="div" sx={{ mt: 1 }}>
                 Recurrence Pattern (Optional)
               </Typography>
-              <TextField
-                fullWidth
-                label="Recurrence Rule (RRULE format)"
-                name="rRule"
-                value={formData.rRule || ''}
-                onChange={handleInputChange}
-                placeholder="e.g. FREQ=WEEKLY;BYDAY=MO,WE,FR"
-                variant="outlined"
-                sx={{ mb: 1 }}
-              />
-              <Box sx={{ bgcolor: 'info.50', p: 2, borderRadius: 1 }}>
-                <Typography variant="caption" component="div" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  Quick Reference for Recurrence Rules:
-                </Typography>
-                <Grid container spacing={1}>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="caption" display="block">
-                      • <b>Weekly on Mon, Wed, Fri:</b><br/>
-                      <code>FREQ=WEEKLY;BYDAY=MO,WE,FR</code>
-                    </Typography>
+              
+              <Box sx={{ border: '1px solid #e0e0e0', p: 2, borderRadius: 1 }}>
+                {/* Recurrence Type Selector */}
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Repeat"
+                      value={formData.recurrenceType || 'none'}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const recType = value as 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+                        const newFormData = { ...formData, recurrenceType: recType };
+                        
+                        // Clear the rRule when changing recurrence type
+                        if (value === 'none') {
+                          delete newFormData.rRule;
+                        }
+                        
+                        setFormData(newFormData);
+                      }}
+                      variant="outlined"
+                    >
+                      <MenuItem value="none">Does not repeat</MenuItem>
+                      <MenuItem value="daily">Daily</MenuItem>
+                      <MenuItem value="weekly">Weekly</MenuItem>
+                      <MenuItem value="monthly">Monthly</MenuItem>
+                      <MenuItem value="yearly">Yearly</MenuItem>
+                      <MenuItem value="custom">Custom...</MenuItem>
+                    </TextField>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="caption" display="block">
-                      • <b>Every 2 weeks:</b><br/>
-                      <code>FREQ=WEEKLY;INTERVAL=2</code>
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="caption" display="block">
-                      • <b>Monthly on the 1st:</b><br/>
-                      <code>FREQ=MONTHLY;BYMONTHDAY=1</code>
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="caption" display="block">
-                      • <b>Until Dec 31, 2025:</b><br/>
-                      Add <code>;UNTIL=20251231T000000Z</code>
-                    </Typography>
-                  </Grid>
+                  
+                  {/* Conditional recurrence options based on selected type */}
+                  {formData.recurrenceType === 'daily' && (
+                    <Grid item xs={12}>
+                      <Grid container spacing={2} alignItems="center">
+                        <Grid item>
+                          <Typography>Every</Typography>
+                        </Grid>
+                        <Grid item xs={2}>
+                          <TextField
+                            type="number"
+                            inputProps={{ min: 1, max: 365 }}
+                            value={formData.interval || 1}
+                            onChange={(e) => {
+                              const interval = parseInt(e.target.value) || 1;
+                              const rRule = `FREQ=DAILY;INTERVAL=${interval}`;
+                              setFormData({ ...formData, interval, rRule });
+                            }}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item>
+                          <Typography>day(s)</Typography>
+                        </Grid>
+                      </Grid>
+                    </Grid>
+                  )}
+                  
+                  {formData.recurrenceType === 'weekly' && (
+                    <Grid item xs={12}>
+                      <Grid container spacing={2} direction="column">
+                        <Grid item container alignItems="center" spacing={2}>
+                          <Grid item>
+                            <Typography>Every</Typography>
+                          </Grid>
+                          <Grid item xs={2}>
+                            <TextField
+                              type="number"
+                              inputProps={{ min: 1, max: 52 }}
+                              value={formData.interval || 1}
+                              onChange={(e) => {
+                                const interval = parseInt(e.target.value) || 1;
+                                setFormData({ ...formData, interval });
+                                
+                                // Update the rRule based on days of week and interval
+                                const selectedDays = formData.selectedDays || ['MO'];
+                                const rRule = `FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${selectedDays.join(',')}`;
+                                setFormData(prev => ({ ...prev, interval, rRule }));
+                              }}
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item>
+                            <Typography>week(s) on:</Typography>
+                          </Grid>
+                        </Grid>
+                        
+                        <Grid item container spacing={1} sx={{ mt: 1 }}>
+                          {['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'].map((day, index) => {
+                            const dayLabels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                            const selectedDays = formData.selectedDays || ['MO'];
+                            const isSelected = selectedDays.includes(day);
+                            
+                            return (
+                              <Grid item key={day}>
+                                <Chip 
+                                  label={dayLabels[index].substring(0, 3)} 
+                                  color={isSelected ? "primary" : "default"}
+                                  onClick={() => {
+                                    let newSelectedDays;
+                                    if (isSelected) {
+                                      // Remove day, but ensure at least one day remains selected
+                                      newSelectedDays = selectedDays.filter(d => d !== day);
+                                      if (newSelectedDays.length === 0) {
+                                        newSelectedDays = ['MO']; // Default to Monday if nothing selected
+                                      }
+                                    } else {
+                                      // Add day
+                                      newSelectedDays = [...selectedDays, day];
+                                    }
+                                    
+                                    // Update the rRule
+                                    const interval = formData.interval || 1;
+                                    const rRule = `FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${newSelectedDays.join(',')}`;
+                                    setFormData({ ...formData, selectedDays: newSelectedDays, rRule });
+                                  }}
+                                />
+                              </Grid>
+                            );
+                          })}
+                        </Grid>
+                      </Grid>
+                    </Grid>
+                  )}
+                  
+                  {formData.recurrenceType === 'monthly' && (
+                    <Grid item xs={12}>
+                      <Grid container spacing={2} alignItems="center">
+                        <Grid item>
+                          <Typography>Day</Typography>
+                        </Grid>
+                        <Grid item xs={2}>
+                          <TextField
+                            type="number"
+                            inputProps={{ min: 1, max: 31 }}
+                            value={formData.monthDay || new Date(formData.startDate || new Date()).getDate()}
+                            onChange={(e) => {
+                              const monthDay = parseInt(e.target.value) || 1;
+                              const rRule = `FREQ=MONTHLY;BYMONTHDAY=${monthDay}`;
+                              setFormData({ ...formData, monthDay, rRule });
+                            }}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item>
+                          <Typography>of every</Typography>
+                        </Grid>
+                        <Grid item xs={2}>
+                          <TextField
+                            type="number"
+                            inputProps={{ min: 1, max: 12 }}
+                            value={formData.interval || 1}
+                            onChange={(e) => {
+                              const interval = parseInt(e.target.value) || 1;
+                              const monthDay = formData.monthDay || new Date(formData.startDate || new Date()).getDate();
+                              const rRule = `FREQ=MONTHLY;INTERVAL=${interval};BYMONTHDAY=${monthDay}`;
+                              setFormData({ ...formData, interval, rRule });
+                            }}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item>
+                          <Typography>month(s)</Typography>
+                        </Grid>
+                      </Grid>
+                    </Grid>
+                  )}
+                  
+                  {formData.recurrenceType === 'yearly' && (
+                    <Grid item xs={12}>
+                      <Grid container spacing={2} alignItems="center">
+                        <Grid item>
+                          <Typography>Every</Typography>
+                        </Grid>
+                        <Grid item xs={2}>
+                          <TextField
+                            type="number"
+                            inputProps={{ min: 1, max: 10 }}
+                            value={formData.interval || 1}
+                            onChange={(e) => {
+                              const interval = parseInt(e.target.value) || 1;
+                              const startDate = new Date(formData.startDate || new Date());
+                              const month = startDate.getMonth() + 1;
+                              const day = startDate.getDate();
+                              const rRule = `FREQ=YEARLY;INTERVAL=${interval};BYMONTH=${month};BYMONTHDAY=${day}`;
+                              setFormData({ ...formData, interval, rRule });
+                            }}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item>
+                          <Typography>year(s) on the same date</Typography>
+                        </Grid>
+                      </Grid>
+                    </Grid>
+                  )}
+                  
+                  {formData.recurrenceType === 'custom' && (
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Custom Recurrence Rule (RRULE format)"
+                        name="rRule"
+                        value={formData.rRule || ''}
+                        onChange={handleInputChange}
+                        placeholder="e.g. FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE,FR"
+                        variant="outlined"
+                      />
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                        For advanced recurrence rules, enter in iCalendar RRULE format
+                      </Typography>
+                    </Grid>
+                  )}
+                  
+                  {/* End recurrence options */}
+                  {formData.recurrenceType && formData.recurrenceType !== 'none' && formData.recurrenceType !== 'custom' && (
+                    <Grid item xs={12}>
+                      <Divider sx={{ my: 1 }} />
+                      <Typography variant="subtitle2">Ends</Typography>
+                      <FormControl component="fieldset">
+                        <RadioGroup
+                          value={formData.endType || 'never'}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Ensure value is cast to proper type
+                            const endTypeValue = value as 'never' | 'count' | 'until';
+                            setFormData({ ...formData, endType: endTypeValue });
+                            
+                            // Update rRule based on end type
+                            let rRule = formData.rRule || '';
+                            
+                            // Remove any existing end conditions
+                            rRule = rRule.replace(/;COUNT=\d+/, '').replace(/;UNTIL=\d+T\d+Z/, '');
+                            
+                            if (endTypeValue === 'count' && formData.endCount) {
+                              rRule += `;COUNT=${formData.endCount}`;
+                            } else if (endTypeValue === 'until' && formData.endDate) {
+                              const date = new Date(formData.endDate);
+                              const untilStr = date.getUTCFullYear() +
+                                String(date.getUTCMonth() + 1).padStart(2, '0') +
+                                String(date.getUTCDate()).padStart(2, '0') + 'T000000Z';
+                              rRule += `;UNTIL=${untilStr}`;
+                            }
+                            
+                            setFormData(prev => ({ ...prev, endType: endTypeValue, rRule }));
+                          }}
+                        >
+                          <FormControlLabel value="never" control={<Radio />} label="Never" />
+                          <FormControlLabel value="count" control={<Radio />} label={
+                            <Box display="flex" alignItems="center">
+                              <Typography sx={{ mr: 1 }}>After</Typography>
+                              <TextField
+                                type="number"
+                                inputProps={{ min: 1, max: 999 }}
+                                value={formData.endCount || 10}
+                                disabled={formData.endType !== 'count'}
+                                onChange={(e) => {
+                                  const endCount = parseInt(e.target.value) || 10;
+                                  let rRule = (formData.rRule || '').replace(/;COUNT=\d+/, '');
+                                  rRule += `;COUNT=${endCount}`;
+                                  setFormData({ ...formData, endCount, rRule });
+                                }}
+                                size="small"
+                                sx={{ width: '80px', mx: 1 }}
+                              />
+                              <Typography>occurrences</Typography>
+                            </Box>
+                          } />
+                          <FormControlLabel value="until" control={<Radio />} label={
+                            <Box display="flex" alignItems="center">
+                              <Typography sx={{ mr: 1 }}>On</Typography>
+                              <TextField
+                                type="date"
+                                value={formData.endDate 
+                                  ? new Date(formData.endDate).toISOString().slice(0, 10) 
+                                  : new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().slice(0, 10)}
+                                disabled={formData.endType !== 'until'}
+                                onChange={(e) => {
+                                  const endDate = new Date(e.target.value);
+                                  let rRule = (formData.rRule || '').replace(/;UNTIL=\d+T\d+Z/, '');
+                                  const untilStr = endDate.getUTCFullYear() +
+                                    String(endDate.getUTCMonth() + 1).padStart(2, '0') +
+                                    String(endDate.getUTCDate()).padStart(2, '0') + 'T000000Z';
+                                  rRule += `;UNTIL=${untilStr}`;
+                                  setFormData({ ...formData, endDate, rRule });
+                                }}
+                                InputLabelProps={{ shrink: true }}
+                              />
+                            </Box>
+                          } />
+                        </RadioGroup>
+                      </FormControl>
+                    </Grid>
+                  )}
+                  
+                  {formData.rRule && (
+                    <Grid item xs={12}>
+                      <Paper elevation={0} sx={{ bgcolor: 'info.50', p: 1, borderRadius: 1 }}>
+                        <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                          {formData.rRule}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  )}
                 </Grid>
               </Box>
             </Grid>
