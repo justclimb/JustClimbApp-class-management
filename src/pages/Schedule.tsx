@@ -645,14 +645,14 @@ const SchedulePage: React.FC = () => {
             </>
           )}
           
+          {/* Support for all-day appointments - must come before DragDropProvider */}
+          <AllDayPanel />
+          
           {/* Add support for drag-and-drop */}
           <DragDropProvider />
           
           {/* Show current time indicator */}
           <CurrentTimeIndicator updateInterval={60000} />
-          
-          {/* Support for all-day appointments */}
-          <AllDayPanel />
           
           <EditRecurrenceMenu />
           <ConfirmationDialog />
