@@ -20,6 +20,7 @@ import {
 } from '@devexpress/dx-react-scheduler';
 import { schedulesApi, classesApi, teachersApi } from '../services/api';
 import { ClassSchedule, Class, Teacher } from '../types';
+import RecurringClassForm from '../components/RecurringClassForm';
 
 const SchedulePage: React.FC = () => {
   const [schedules, setSchedules] = useState<ClassSchedule[]>([]);
@@ -33,6 +34,9 @@ const SchedulePage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<Partial<ClassSchedule>>({});
   const [isNew, setIsNew] = useState(true);
+
+  // Add state for recurring class form
+  const [showRecurringForm, setShowRecurringForm] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -101,19 +105,31 @@ const SchedulePage: React.FC = () => {
     }
 
     const classItem = classes.find(c => c.id === data.classId);
+    // Check if this is a recurring class
+    const isRecurring = data.rRule !== undefined;
+    
+    // Different style for recurring classes
+    const backgroundColor = isRecurring ? '#8c6cef' : (classItem ? '#1976d2' : '#757575');
+    const borderStyle = isRecurring ? '2px dashed rgba(255,255,255,0.5)' : 'none';
+    
     return (
       <Appointments.Appointment
         {...restProps}
         data={data}
         style={{
-          backgroundColor: classItem ? '#1976d2' : '#757575',
+          backgroundColor,
           borderRadius: '4px',
+          borderLeft: borderStyle,
+          borderRight: borderStyle,
         }}
       >
         <div style={{ padding: '2px 8px', color: 'white' }}>
           <strong>{data.title}</strong>
           <div>Teacher: {getTeacherName(data.classId)}</div>
-          <div>Room: {classItem?.room || 'N/A'}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Room: {classItem?.room || 'N/A'}</span>
+            {isRecurring && <span>↻</span>}
+          </div>
         </div>
       </Appointments.Appointment>
     );
@@ -134,6 +150,9 @@ const SchedulePage: React.FC = () => {
     const teacher = classItem 
       ? teachers.find(t => t.id === classItem.teacherId)
       : null;
+    
+    // Check if this is a recurring class
+    const isRecurring = data.rRule !== undefined;
 
     return (
       <AppointmentTooltip.Content {...restProps} data={data}>
@@ -151,6 +170,13 @@ const SchedulePage: React.FC = () => {
           
           <Grid item xs={4} sx={{ fontWeight: 'bold' }}>Capacity:</Grid>
           <Grid item xs={8}>{classItem?.capacity || 'N/A'}</Grid>
+          
+          {isRecurring && (
+            <>
+              <Grid item xs={4} sx={{ fontWeight: 'bold' }}>Recurring:</Grid>
+              <Grid item xs={8} sx={{ color: 'primary.main' }}>Yes</Grid>
+            </>
+          )}
           
           {data.notes && (
             <>
@@ -270,8 +296,26 @@ const SchedulePage: React.FC = () => {
       endDate: schedule.endDate ? new Date(schedule.endDate) : new Date(),
       title: schedule.title || getClassName(schedule.classId),
       notes: schedule.notes,
+      rRule: schedule.rRule
     };
   }).filter(Boolean) as any[];
+
+  const handleSaveRecurringClasses = async (schedules: Omit<ClassSchedule, 'id'>[]) => {
+    try {
+      // Save all schedules
+      const savePromises = schedules.map(schedule => schedulesApi.create(schedule));
+      await Promise.all(savePromises);
+      
+      // Refresh schedules data
+      const schedulesData = await schedulesApi.getAll();
+      setSchedules(schedulesData);
+      
+      return Promise.resolve();
+    } catch (error) {
+      console.error('Error saving recurring schedules:', error);
+      return Promise.reject(error);
+    }
+  };
 
   if (loading) {
     return <Typography>Loading schedule data...</Typography>;
@@ -283,13 +327,22 @@ const SchedulePage: React.FC = () => {
         <Typography variant="h4" component="h1">
           Schedule Management
         </Typography>
-        <Button 
-          variant="contained" 
-          color="primary"
-          onClick={() => handleOpenForm()}
-        >
-          Add Class Schedule
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button 
+            variant="outlined" 
+            color="primary"
+            onClick={() => setShowRecurringForm(true)}
+          >
+            Add Recurring Classes
+          </Button>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={() => handleOpenForm()}
+          >
+            Add Single Class
+          </Button>
+        </Box>
       </Box>
 
       <Paper>
@@ -428,6 +481,14 @@ const SchedulePage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Recurring Class Form */}
+      <RecurringClassForm
+        open={showRecurringForm}
+        onClose={() => setShowRecurringForm(false)}
+        classes={classes}
+        onSave={handleSaveRecurringClasses}
+      />
     </div>
   );
 };
