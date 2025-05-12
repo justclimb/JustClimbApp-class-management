@@ -482,6 +482,7 @@ const SchedulePage: React.FC = () => {
           <TodayButton />
           <ViewSwitcher />
           <Appointments appointmentComponent={Appointment} />
+          <ConfirmationDialog />
           <EditRecurrenceMenu />
           <AppointmentTooltip
             showOpenButton
@@ -489,7 +490,6 @@ const SchedulePage: React.FC = () => {
             contentComponent={AppointmentContent}
           />
           <AppointmentForm />
-          <ConfirmationDialog />
         </Scheduler>
       </Paper>
 
