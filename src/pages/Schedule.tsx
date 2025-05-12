@@ -161,7 +161,7 @@ const SchedulePage: React.FC = () => {
       );
     }
 
-    const classItem = classes.find(c => c.id === data.classId);
+    const classItem = classes?.find(c => c?.id === data.classId);
     // Check if this is a recurring class
     const isRecurring = data.rRule !== undefined;
     
@@ -220,9 +220,9 @@ const SchedulePage: React.FC = () => {
       );
     }
 
-    const classItem = classes.find(c => c.id === data.classId);
-    const coach = classItem 
-      ? coaches.find(t => t.id === data.coachId)
+    const classItem = classes?.find(c => c?.id === data.classId);
+    const coach = classItem && coaches
+      ? coaches.find(t => t?.id === data.coachId)
       : null;
     
     // Check if this is a recurring class
@@ -554,7 +554,7 @@ const SchedulePage: React.FC = () => {
     title: 'Coach',
     instances: coaches && coaches.length > 0 
       ? coaches.map(coach => ({
-          id: coach.id,
+          id: coach?.id || 0,
           text: coach ? `${coach.firstName || ''} ${coach.lastName || ''}`.trim() : 'Unknown Coach'
         }))
       : [{ id: 0, text: 'No Coaches Available' }],
@@ -617,9 +617,9 @@ const SchedulePage: React.FC = () => {
           
           <Appointments appointmentComponent={Appointment} />
           
-          {/* Resources comes after Appointments */}
+          {/* Always provide a default empty array for Resources when no data is available */}
           <Resources
-            data={resources}
+            data={resources || []}
           />
           
           {/* GroupingState must come before IntegratedGrouping and GroupingPanel */}
@@ -673,9 +673,9 @@ const SchedulePage: React.FC = () => {
                 error={!formData.classId}
                 helperText={!formData.classId ? "Please select a class" : ""}
               >
-                {classes.map((classItem) => (
-                  <MenuItem key={classItem.id} value={classItem.id}>
-                    {classItem.name} - Room: {classItem.room} (Coach: {getCoachName(classItem.id)})
+                {(classes || []).map((classItem) => (
+                  <MenuItem key={classItem?.id || 'unknown'} value={classItem?.id || ''}>
+                    {classItem?.name || 'Unknown'} - Room: {classItem?.room || 'N/A'} (Coach: {getCoachName(classItem?.id)})
                   </MenuItem>
                 ))}
               </TextField>
@@ -837,7 +837,7 @@ const SchedulePage: React.FC = () => {
                             return (
                               <Grid item key={day}>
                                 <Chip 
-                                  label={dayLabels[index].substring(0, 3)} 
+                                  label={dayLabels[index]?.substring(0, 3) || day} 
                                   color={isSelected ? "primary" : "default"}
                                   onClick={() => {
                                     let newSelectedDays;
