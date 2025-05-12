@@ -279,7 +279,6 @@ const SchedulePage: React.FC = () => {
         id: appointmentData.id,
         classId: appointmentData.classId,
         startDate: appointmentData.startDate,
-        endDate: appointmentData.endDate,
         title: appointmentData.title,
         notes: appointmentData.notes,
         rRule: appointmentData.rRule,
@@ -319,7 +318,7 @@ const SchedulePage: React.FC = () => {
           ? parseInt(appointmentData.rRule.match(/COUNT=(\d+)/)[1]) 
           : 10,
         
-        // Parse until date if present
+        // Set end date (for both the appointment end and recurrence end)
         endDate: appointmentData.rRule?.includes('UNTIL=') 
           ? parseUntilDate(appointmentData.rRule) 
           : appointmentData.endDate,
