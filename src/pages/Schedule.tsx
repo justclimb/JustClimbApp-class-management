@@ -645,6 +645,9 @@ const SchedulePage: React.FC = () => {
             </>
           )}
           
+          {/* EditRecurrenceMenu must come before DragDropProvider */}
+          <EditRecurrenceMenu />
+          
           {/* Support for all-day appointments - must come before DragDropProvider */}
           <AllDayPanel />
           
@@ -654,7 +657,6 @@ const SchedulePage: React.FC = () => {
           {/* Show current time indicator */}
           <CurrentTimeIndicator updateInterval={60000} />
           
-          <EditRecurrenceMenu />
           <ConfirmationDialog />
           <AppointmentTooltip
             showOpenButton
