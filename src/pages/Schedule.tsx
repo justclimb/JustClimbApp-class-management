@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Paper, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Grid, Chip, Divider, FormControl, RadioGroup, FormControlLabel, Radio } from '@mui/material';
+import { Typography, Paper, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Grid, Chip, Divider, FormControl, RadioGroup, FormControlLabel, Radio, Switch } from '@mui/material';
 import {
   Scheduler,
   WeekView,
@@ -14,11 +14,15 @@ import {
   AppointmentTooltip,
   ConfirmationDialog,
   EditRecurrenceMenu,
+  Resources,
+  GroupingPanel,
 } from '@devexpress/dx-react-scheduler-material-ui';
 import {
   ViewState,
   EditingState,
   IntegratedEditing,
+  GroupingState,
+  IntegratedGrouping,
   AppointmentModel,
   ChangeSet,
 } from '@devexpress/dx-react-scheduler';
@@ -27,6 +31,7 @@ import { ClassSchedule, Class, Coach } from '../types';
 import DeleteIcon from '@mui/icons-material/Delete';
 
 // Add exDate property to ClassSchedule for handling recurring exceptions
+// Add coachId to the ExtendedClassSchedule interface for grouping functionality
 interface ExtendedClassSchedule extends ClassSchedule {
   exDate?: string;
   // Recurrence form properties
@@ -37,7 +42,29 @@ interface ExtendedClassSchedule extends ClassSchedule {
   endType?: 'never' | 'count' | 'until';
   endCount?: number;
   endDate: Date;
+  // Add coach information for grouping
+  coachId?: number;
 }
+
+// Helper function to parse UNTIL date from RRULE
+const parseUntilDate = (rRule: string): Date => {
+  try {
+    if (rRule.includes('UNTIL=')) {
+      const untilMatch = rRule.match(/UNTIL=(\d{8}T\d{6}Z)/);
+      if (untilMatch && untilMatch[1]) {
+        const untilStr = untilMatch[1];
+        const year = parseInt(untilStr.substring(0, 4));
+        const month = parseInt(untilStr.substring(4, 6)) - 1; // JS months are 0-indexed
+        const day = parseInt(untilStr.substring(6, 8));
+        return new Date(Date.UTC(year, month, day));
+      }
+    }
+    return new Date(); // Return today if parsing fails
+  } catch (error) {
+    console.error('Error parsing UNTIL date:', error);
+    return new Date();
+  }
+};
 
 const SchedulePage: React.FC = () => {
   const [schedules, setSchedules] = useState<ExtendedClassSchedule[]>([]);
@@ -46,6 +73,8 @@ const SchedulePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentViewName, setCurrentViewName] = useState('Week');
+  // Add state for grouping by coach
+  const [groupByCoach, setGroupByCoach] = useState(false);
 
   // State for custom appointment form
   const [showForm, setShowForm] = useState(false);
@@ -92,6 +121,13 @@ const SchedulePage: React.FC = () => {
     return coach ? `${coach.firstName} ${coach.lastName}` : 'Unknown Coach';
   };
 
+  // Get coach ID by class ID
+  const getCoachId = (classId?: number): number | undefined => {
+    if (classId === undefined || classId === null) return undefined;
+    const classItem = classes.find(c => c.id === classId);
+    return classItem ? classItem.coachId : undefined;
+  };
+
   // Handling scheduler views
   const handleCurrentDateChange = (date: Date) => {
     setCurrentDate(date);
@@ -99,6 +135,11 @@ const SchedulePage: React.FC = () => {
 
   const handleCurrentViewNameChange = (viewName: string) => {
     setCurrentViewName(viewName);
+  };
+
+  // Toggle group by coach
+  const handleGroupByCoachChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setGroupByCoach(event.target.checked);
   };
 
   // Custom appointment component
@@ -159,7 +200,7 @@ const SchedulePage: React.FC = () => {
         )}
         <div style={{ padding: '2px 8px', color: 'white' }}>
           <strong>{data.title}</strong>
-          <div>Coach: {getCoachName(data.classId)}</div>
+          {!groupByCoach && <div>Coach: {getCoachName(data.classId)}</div>}
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Room: {classItem?.room || 'N/A'}</span>
           </div>
@@ -181,7 +222,7 @@ const SchedulePage: React.FC = () => {
 
     const classItem = classes.find(c => c.id === data.classId);
     const coach = classItem 
-      ? coaches.find(t => t.id === classItem.coachId)
+      ? coaches.find(t => t.id === data.coachId)
       : null;
     
     // Check if this is a recurring class
@@ -201,13 +242,20 @@ const SchedulePage: React.FC = () => {
           <Grid item xs={4} sx={{ fontWeight: 'bold' }}>Room:</Grid>
           <Grid item xs={8}>{classItem?.room || 'N/A'}</Grid>
           
-          <Grid item xs={4} sx={{ fontWeight: 'bold' }}>Capacity:</Grid>
-          <Grid item xs={8}>{classItem?.capacity || 'N/A'}</Grid>
+          <Grid item xs={4} sx={{ fontWeight: 'bold' }}>Time:</Grid>
+          <Grid item xs={8}>
+            {new Date(data.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
+            {new Date(data.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Grid>
           
           {isRecurring && (
             <>
-              <Grid item xs={4} sx={{ fontWeight: 'bold' }}>Recurring:</Grid>
-              <Grid item xs={8} sx={{ color: 'primary.main' }}>Yes</Grid>
+              <Grid item xs={4} sx={{ fontWeight: 'bold' }}>Recurrence:</Grid>
+              <Grid item xs={8}>
+                <Typography variant="body2" style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                  {data.rRule}
+                </Typography>
+              </Grid>
             </>
           )}
           
@@ -222,10 +270,10 @@ const SchedulePage: React.FC = () => {
     );
   };
 
-  // Handle open form for editing
+  // Handle opening form for new appointment or editing existing one
   const handleOpenForm = (appointmentData?: any) => {
-    if (appointmentData && appointmentData.id !== undefined) {
-      // Edit existing appointment
+    if (appointmentData) {
+      // Editing existing appointment
       setIsNew(false);
       setFormData({
         id: appointmentData.id,
@@ -236,23 +284,56 @@ const SchedulePage: React.FC = () => {
         notes: appointmentData.notes,
         rRule: appointmentData.rRule,
         exDate: appointmentData.exDate,
+        coachId: appointmentData.coachId,
+        
+        // Set recurrence form fields based on rRule if it exists
+        recurrenceType: appointmentData.rRule ? 
+          (appointmentData.rRule.includes('FREQ=DAILY') ? 'daily' : 
+          appointmentData.rRule.includes('FREQ=WEEKLY') ? 'weekly' :
+          appointmentData.rRule.includes('FREQ=MONTHLY') ? 'monthly' :
+          appointmentData.rRule.includes('FREQ=YEARLY') ? 'yearly' : 'custom') : 'none',
+        
+        // Try to parse interval
+        interval: appointmentData.rRule?.match(/INTERVAL=(\d+)/)?.[1] 
+          ? parseInt(appointmentData.rRule.match(/INTERVAL=(\d+)/)[1]) : 1,
+        
+        // Try to parse selected days for weekly recurrence
+        selectedDays: appointmentData.rRule?.includes('BYDAY=') 
+          ? appointmentData.rRule.match(/BYDAY=([^;]+)/)[1].split(',') 
+          : ['MO'],
+        
+        // Try to parse monthly day
+        monthDay: appointmentData.rRule?.includes('BYMONTHDAY=') 
+          ? parseInt(appointmentData.rRule.match(/BYMONTHDAY=(\d+)/)[1]) 
+          : new Date(appointmentData.startDate).getDate(),
+        
+        // Parse end type
+        endType: appointmentData.rRule?.includes('COUNT=') 
+          ? 'count' 
+          : appointmentData.rRule?.includes('UNTIL=') 
+          ? 'until' 
+          : 'never',
+        
+        // Parse count if present
+        endCount: appointmentData.rRule?.includes('COUNT=') 
+          ? parseInt(appointmentData.rRule.match(/COUNT=(\d+)/)[1]) 
+          : 10,
+        
+        // Parse until date if present
+        endDate: appointmentData.rRule?.includes('UNTIL=') 
+          ? parseUntilDate(appointmentData.rRule) 
+          : appointmentData.endDate,
       });
     } else {
-      // Create new appointment
+      // Creating new appointment
       setIsNew(true);
-      const now = new Date();
-      const startDate = new Date(now);
-      startDate.setHours(startDate.getHours() + 1, 0, 0, 0);
-      
-      const endDate = new Date(startDate);
-      endDate.setHours(endDate.getHours() + 1);
-      
       setFormData({
-        classId: classes.length > 0 ? classes[0].id : 0,
-        startDate,
-        endDate,
-        title: classes.length > 0 ? classes[0].name : '',
+        classId: undefined,
+        startDate: new Date(Math.ceil(new Date().getTime() / (30*60*1000)) * (30*60*1000)), // Round to next half hour
+        endDate: new Date(Math.ceil(new Date().getTime() / (30*60*1000)) * (30*60*1000) + 60*60*1000), // 1 hour later
+        title: '',
         notes: '',
+        recurrenceType: 'none',
       });
     }
     setShowForm(true);
@@ -344,7 +425,7 @@ const SchedulePage: React.FC = () => {
       setFormSubmitting(true);
 
       // Validate form data
-      if (!formData.title || !formData.startDate || !formData.endDate || !formData.classId) {
+      if (!formData.title && !formData.classId) {
         setFormError('Please fill in all required fields');
         setFormSubmitting(false);
         return;
@@ -353,11 +434,16 @@ const SchedulePage: React.FC = () => {
       // Make sure we always have a valid endDate
       const endDate = formData.endDate || new Date();
 
+      // Get coach ID for the selected class
+      const coachId = getCoachId(formData.classId);
+
       if (isNew) {
         // Create new schedule
         const newSchedule = await schedulesApi.create({
           ...formData,
           endDate, // Use the validated endDate
+          coachId, // Add coach ID
+          title: formData.title || getClassName(formData.classId) // Use class name if title not provided
         } as Omit<ExtendedClassSchedule, 'id'>);
         setSchedules([...schedules, newSchedule]);
       } else {
@@ -365,11 +451,14 @@ const SchedulePage: React.FC = () => {
         const updatedSchedule = await schedulesApi.update(formData.id!, {
           ...formData,
           endDate, // Use the validated endDate
+          coachId, // Add coach ID
+          title: formData.title || getClassName(formData.classId) // Use class name if title not provided
         } as Omit<ExtendedClassSchedule, 'id'>);
         if (updatedSchedule) {
           setSchedules(schedules.map(s => s.id === updatedSchedule.id ? updatedSchedule : s));
         }
       }
+
       setShowForm(false);
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -390,14 +479,19 @@ const SchedulePage: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: date }));
   };
 
+  // Handle class selection change
   const handleClassChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const classId = parseInt(e.target.value);
+    const classId = Number(e.target.value);
     const classItem = classes.find(c => c.id === classId);
-    setFormData(prev => ({ 
-      ...prev, 
-      classId, 
-      title: classItem ? classItem.name : '' 
-    }));
+    const coachId = classItem?.coachId;
+    
+    setFormData({
+      ...formData,
+      classId,
+      coachId,
+      // If title is empty, use class name as default title
+      title: formData.title || (classItem ? classItem.name : '')
+    });
   };
 
   // Handle appointment deletion
@@ -431,6 +525,9 @@ const SchedulePage: React.FC = () => {
       }
       
       try {
+        // Get the coach ID for this class
+        const coachId = getCoachId(schedule.classId);
+        
         // Create appointment with safe access to properties, providing fallbacks
         return {
           id: schedule.id,
@@ -440,7 +537,9 @@ const SchedulePage: React.FC = () => {
           title: schedule.title || getClassName(schedule.classId),
           notes: schedule.notes || '',
           rRule: schedule.rRule || undefined,
-          exDate: schedule.exDate || undefined
+          exDate: schedule.exDate || undefined,
+          // Add coach ID for grouping
+          coachId: coachId
         };
       } catch (error) {
         console.error('Error converting schedule to appointment:', error, schedule);
@@ -449,6 +548,17 @@ const SchedulePage: React.FC = () => {
     })
     // Filter out any null appointments that resulted from errors
     .filter(Boolean) as AppointmentModel[];
+
+  // Create resources for coach grouping
+  const resources = [{
+    fieldName: 'coachId',
+    title: 'Coach',
+    instances: coaches.map(coach => ({
+      id: coach.id,
+      text: `${coach.firstName} ${coach.lastName}`
+    })),
+    allowMultiple: false,
+  }];
 
   if (loading) {
     return <Typography>Loading schedule data...</Typography>;
@@ -460,13 +570,26 @@ const SchedulePage: React.FC = () => {
         <Typography variant="h4" component="h1">
           Schedule Management
         </Typography>
-        <Button 
-          variant="contained" 
-          color="primary"
-          onClick={() => handleOpenForm()}
-        >
-          Add Class
-        </Button>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={groupByCoach}
+                onChange={handleGroupByCoachChange}
+                color="primary"
+              />
+            }
+            label="Group by Coach"
+            sx={{ mr: 2 }}
+          />
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={() => handleOpenForm()}
+          >
+            Add Class
+          </Button>
+        </Box>
       </Box>
 
       <Paper>
@@ -481,6 +604,15 @@ const SchedulePage: React.FC = () => {
             onCommitChanges={commitChanges}
           />
           <IntegratedEditing />
+          
+          {groupByCoach && (
+            <>
+              <GroupingState
+                grouping={[{ resourceName: 'coachId' }]}
+              />
+              <IntegratedGrouping />
+            </>
+          )}
 
           <DayView startDayHour={8} endDayHour={21} />
           <WeekView startDayHour={8} endDayHour={21} />
@@ -490,6 +622,15 @@ const SchedulePage: React.FC = () => {
           <DateNavigator />
           <TodayButton />
           <ViewSwitcher />
+          
+          <Resources
+            data={resources}
+          />
+          
+          {groupByCoach && (
+            <GroupingPanel />
+          )}
+          
           <Appointments appointmentComponent={Appointment} />
           <EditRecurrenceMenu />
           <ConfirmationDialog />
