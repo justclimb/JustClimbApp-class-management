@@ -403,6 +403,7 @@ const SchedulePage: React.FC = () => {
           <TodayButton />
           <ViewSwitcher />
           <Appointments appointmentComponent={Appointment} />
+          <EditRecurrenceMenu />
           <AppointmentTooltip
             showOpenButton
             showDeleteButton
@@ -410,7 +411,6 @@ const SchedulePage: React.FC = () => {
           />
           <AppointmentForm />
           <ConfirmationDialog />
-          <EditRecurrenceMenu />
         </Scheduler>
       </Paper>
 
