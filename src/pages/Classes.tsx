@@ -175,6 +175,9 @@ const ClassesPage: React.FC = () => {
           columns={columns}
           getRowId={getRowId}
         >
+          <EditingState 
+            onCommitChanges={() => {}}
+          />
           <SortingState defaultSorting={[{ columnName: 'name', direction: 'asc' }]} />
           <IntegratedSorting />
           <PagingState defaultCurrentPage={0} pageSize={10} />

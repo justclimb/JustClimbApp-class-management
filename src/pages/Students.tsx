@@ -16,6 +16,7 @@ import {
   IntegratedSorting,
   DataTypeProvider,
   DataTypeProviderProps,
+  EditingState,
 } from '@devexpress/dx-react-grid';
 import { studentsApi, classesApi } from '../services/api';
 import { Student, Class } from '../types';
@@ -212,6 +213,9 @@ const StudentsPage: React.FC = () => {
           rows={students}
           columns={columns}
         >
+          <EditingState 
+            onCommitChanges={() => {}}
+          />
           <SortingState defaultSorting={[{ columnName: 'lastName', direction: 'asc' }]} />
           <IntegratedSorting />
           <PagingState defaultCurrentPage={0} pageSize={10} />
