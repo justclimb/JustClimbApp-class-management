@@ -126,14 +126,31 @@ const SchedulePage: React.FC = () => {
           borderRadius: '4px',
           borderLeft: borderStyle,
           borderRight: borderStyle,
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
+        {isRecurring && (
+          <div 
+            style={{ 
+              position: 'absolute', 
+              top: 0, 
+              right: 0, 
+              backgroundColor: 'rgba(255,255,255,0.3)', 
+              padding: '1px 4px',
+              borderBottomLeftRadius: '4px',
+              fontSize: '10px',
+              color: 'white'
+            }}
+          >
+            ↻
+          </div>
+        )}
         <div style={{ padding: '2px 8px', color: 'white' }}>
           <strong>{data.title}</strong>
           <div>Teacher: {getTeacherName(data.classId)}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Room: {classItem?.room || 'N/A'}</span>
-            {isRecurring && <span>↻</span>}
           </div>
         </div>
       </Appointments.Appointment>
@@ -248,10 +265,28 @@ const SchedulePage: React.FC = () => {
         );
         
         if (appointmentIndex > -1) {
+          const originalAppointment = updatedSchedules[appointmentIndex];
+          const changesObj = changed[changedAppointment];
+          
+          // Check if this is a recurring appointment
+          const isRecurring = originalAppointment.rRule;
+          
+          // Create the updated appointment object
           const updatedAppointment = {
-            ...updatedSchedules[appointmentIndex],
-            ...changed[changedAppointment]
+            ...originalAppointment,
+            ...changesObj
           };
+          
+          // If it's a recurring appointment and we're modifying the date/time,
+          // confirm with the user which instances to update
+          if (isRecurring && 
+              (changesObj.startDate || changesObj.endDate) &&
+              !window.confirm('This is a recurring appointment. Do you want to update all instances?')) {
+            // User chose not to update all instances
+            // Here you would typically handle exception dates with exDate
+            // For simplicity, we'll just cancel the edit
+            return;
+          }
           
           const result = await schedulesApi.update(
             updatedAppointment.id, 
@@ -269,6 +304,14 @@ const SchedulePage: React.FC = () => {
       }
 
       if (deleted !== undefined) {
+        // Check if it's a recurring appointment
+        const appointmentToDelete = schedules.find(s => s.id === deleted);
+        if (appointmentToDelete?.rRule && 
+            !window.confirm('This is a recurring appointment. Do you want to delete all instances?')) {
+          // User chose not to delete all instances
+          return;
+        }
+        
         const success = await schedulesApi.delete(deleted as number);
         if (success) {
           updatedSchedules = updatedSchedules.filter(
@@ -287,6 +330,18 @@ const SchedulePage: React.FC = () => {
   // Handle form submission
   const handleFormSubmit = async () => {
     try {
+      // Validate required fields
+      if (!formData.classId || !formData.startDate || !formData.endDate) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      // Ensure the rRule is in valid iCalendar format if provided
+      if (formData.rRule && !formData.rRule.startsWith('FREQ=')) {
+        alert('Recurrence rule must be in iCalendar RRULE format (e.g., FREQ=WEEKLY;BYDAY=MO,WE,FR)');
+        return;
+      }
+
       if (isNew) {
         // Create new schedule
         const newSchedule = await schedulesApi.create(formData as Omit<ExtendedClassSchedule, 'id'>);
@@ -343,6 +398,30 @@ const SchedulePage: React.FC = () => {
       }
     }
   };
+
+  // Custom form for recurrence rule 
+  const rRuleHelperText = (
+    <Box>
+      <Typography variant="caption">
+        For recurring classes, use standard RRULE format or leave empty for single class.
+      </Typography>
+      <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+        Examples:
+      </Typography>
+      <Typography variant="caption" sx={{ display: 'block' }}>
+        • Weekly on Mon, Wed, Fri: <code>FREQ=WEEKLY;BYDAY=MO,WE,FR</code>
+      </Typography>
+      <Typography variant="caption" sx={{ display: 'block' }}>
+        • Every 2 weeks: <code>FREQ=WEEKLY;INTERVAL=2</code>
+      </Typography>
+      <Typography variant="caption" sx={{ display: 'block' }}>
+        • Monthly on the 1st: <code>FREQ=MONTHLY;BYMONTHDAY=1</code>
+      </Typography>
+      <Typography variant="caption" sx={{ display: 'block' }}>
+        • Until Dec 31, 2025: Add <code>;UNTIL=20251231T000000Z</code>
+      </Typography>
+    </Box>
+  );
 
   // Convert schedules to appointments format
   const appointments = schedules.map(schedule => {
@@ -491,9 +570,17 @@ const SchedulePage: React.FC = () => {
                 value={formData.rRule || ''}
                 onChange={handleInputChange}
                 placeholder="e.g. FREQ=WEEKLY;BYDAY=MO,WE,FR"
-                helperText="For recurring classes. Use standard RRULE format or leave empty for single class."
+                helperText={rRuleHelperText}
+                multiline
               />
             </Grid>
+            {formData.rRule && !isNew && (
+              <Grid item xs={12}>
+                <Typography variant="body2" color="primary">
+                  You are editing a recurring class. Changes will affect all instances of this class.
+                </Typography>
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions>
