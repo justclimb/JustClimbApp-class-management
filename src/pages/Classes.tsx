@@ -6,7 +6,6 @@ import {
   Table,
   TableHeaderRow,
   PagingPanel,
-  TableEditRow,
   TableEditColumn,
 } from '@devexpress/dx-react-grid-material-ui';
 import {
@@ -24,21 +23,21 @@ import { Class, Coach } from '../types';
 const getRowId = (row: Class) => row.id;
 
 // DateFormatter component
-const DateFormatter: React.FC<DataTypeProvider.ValueFormatterProps> = ({ value }) => {
-  return <>{value ? new Date(value).toLocaleDateString() : ''}</>;
-};
+const DateFormatter = ({ value }: DataTypeProvider.ValueFormatterProps) => (
+  <>{value ? new Date(value).toLocaleDateString() : ''}</>
+);
 
-const DateTypeProvider: React.FC<DataTypeProviderProps> = (props) => (
+const DateTypeProvider = (props: DataTypeProviderProps) => (
   <DataTypeProvider formatterComponent={DateFormatter} {...props} />
 );
 
-// Teacher name formatter
-const CoachFormatter: React.FC<DataTypeProvider.ValueFormatterProps & { coaches: Coach[] }> = ({ value, coaches }) => {
+// Coach name formatter
+const CoachFormatter = ({ value, coaches }: DataTypeProvider.ValueFormatterProps & { coaches: Coach[] }) => {
   const coach = coaches.find(t => t.id === value);
   return <>{coach ? `${coach.firstName} ${coach.lastName}` : ''}</>;
 };
 
-const CoachTypeProvider: React.FC<DataTypeProviderProps & { coaches: Coach[] }> = ({ coaches, ...props }) => (
+const CoachTypeProvider = ({ coaches, ...props }: DataTypeProviderProps & { coaches: Coach[] }) => (
   <DataTypeProvider
     formatterComponent={(formatterProps) => <CoachFormatter coaches={coaches} {...formatterProps} />}
     {...props}
@@ -52,6 +51,7 @@ const ClassesPage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [currentClass, setCurrentClass] = useState<Partial<Class> | null>(null);
   const [isNew, setIsNew] = useState(true);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const columns = [
     { name: 'name', title: 'Class Name' },
@@ -64,24 +64,47 @@ const ClassesPage: React.FC = () => {
   const dateColumns = ['startDate', 'endDate'];
   const coachColumns = ['coachId'];
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [classesData, coachesData] = await Promise.all([
-          classesApi.getAll(),
-          coachesApi.getAll()
-        ]);
-        setClasses(classesData);
-        setCoaches(coachesData);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchData = async () => {
+    try {
+      const [classesData, coachesData] = await Promise.all([
+        classesApi.getAll(),
+        coachesApi.getAll()
+      ]);
+      setClasses(classesData);
+      setCoaches(coachesData);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchData();
   }, []);
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    
+    if (!currentClass?.name?.trim()) {
+      errors.name = 'Class name is required';
+    }
+    
+    if (!currentClass?.coachId) {
+      errors.coachId = 'A coach must be assigned';
+    }
+    
+    if (!currentClass?.room?.trim()) {
+      errors.room = 'Room is required';
+    }
+    
+    if (!currentClass?.capacity || currentClass.capacity <= 0) {
+      errors.capacity = 'Capacity must be greater than 0';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleAddClass = () => {
     setIsNew(true);
@@ -94,6 +117,7 @@ const ClassesPage: React.FC = () => {
       capacity: 20,
       room: ''
     });
+    setFormErrors({});
     setShowForm(true);
   };
 
@@ -102,6 +126,7 @@ const ClassesPage: React.FC = () => {
     if (classToEdit) {
       setIsNew(false);
       setCurrentClass({ ...classToEdit });
+      setFormErrors({});
       setShowForm(true);
     }
   };
@@ -113,7 +138,7 @@ const ClassesPage: React.FC = () => {
         if (success) {
           setClasses(classes.filter(c => c.id !== id));
         } else {
-          alert('Failed to delete the class');
+          alert('Failed to delete the class. It may have associated schedules or students.');
         }
       } catch (error) {
         console.error('Error deleting class:', error);
@@ -124,6 +149,10 @@ const ClassesPage: React.FC = () => {
 
   const handleFormSubmit = async () => {
     if (!currentClass) return;
+    
+    if (!validateForm()) {
+      return;
+    }
 
     try {
       if (isNew) {
@@ -146,7 +175,32 @@ const ClassesPage: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setCurrentClass(prev => ({ ...prev, [name]: name === 'capacity' ? parseInt(value) : value }));
+    setCurrentClass(prev => {
+      if (!prev) return null;
+      
+      // Handle capacity conversion to number
+      if (name === 'capacity') {
+        return { ...prev, [name]: parseInt(value) || 0 };
+      }
+      
+      return { ...prev, [name]: value };
+    });
+    
+    // Clear error for this field if it exists
+    if (formErrors[name]) {
+      setFormErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+  };
+
+  // Handle DevExpress grid edit/delete actions
+  const commitChanges = ({ deleted }: any) => {
+    if (deleted) {
+      handleDeleteClass(deleted[0]);
+    }
   };
 
   if (loading) {
@@ -175,13 +229,13 @@ const ClassesPage: React.FC = () => {
           columns={columns}
           getRowId={getRowId}
         >
-          <EditingState 
-            onCommitChanges={() => {}}
-          />
           <SortingState defaultSorting={[{ columnName: 'name', direction: 'asc' }]} />
           <IntegratedSorting />
           <PagingState defaultCurrentPage={0} pageSize={10} />
           <IntegratedPaging />
+          <EditingState 
+            onCommitChanges={commitChanges}
+          />
           <DateTypeProvider for={dateColumns} />
           <CoachTypeProvider for={coachColumns} coaches={coaches} />
           <Table />
@@ -216,11 +270,21 @@ const ClassesPage: React.FC = () => {
         </DataGrid>
       </Paper>
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="md" fullWidth>
-        <DialogTitle>{isNew ? 'Add New Class' : 'Edit Class'}</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
+      {/* Add/Edit Class Dialog */}
+      <Dialog 
+        open={showForm} 
+        onClose={() => setShowForm(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2, boxShadow: 24 }
+        }}
+      >
+        <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', py: 2 }}>
+          {isNew ? 'Add New Class' : 'Edit Class'}
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Grid container spacing={3} sx={{ mt: 0 }}>
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -229,6 +293,10 @@ const ClassesPage: React.FC = () => {
                 value={currentClass?.name || ''}
                 onChange={handleInputChange}
                 required
+                error={!!formErrors.name}
+                helperText={formErrors.name}
+                variant="outlined"
+                autoFocus
               />
             </Grid>
             <Grid item xs={12}>
@@ -240,6 +308,7 @@ const ClassesPage: React.FC = () => {
                 onChange={handleInputChange}
                 multiline
                 rows={3}
+                variant="outlined"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -251,6 +320,9 @@ const ClassesPage: React.FC = () => {
                 value={currentClass?.coachId || ''}
                 onChange={handleInputChange}
                 required
+                error={!!formErrors.coachId}
+                helperText={formErrors.coachId}
+                variant="outlined"
               >
                 {coaches.map((coach) => (
                   <MenuItem key={coach.id} value={coach.id}>
@@ -267,6 +339,9 @@ const ClassesPage: React.FC = () => {
                 value={currentClass?.room || ''}
                 onChange={handleInputChange}
                 required
+                error={!!formErrors.room}
+                helperText={formErrors.room}
+                variant="outlined"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -278,20 +353,29 @@ const ClassesPage: React.FC = () => {
                 value={currentClass?.capacity || ''}
                 onChange={handleInputChange}
                 required
+                error={!!formErrors.capacity}
+                helperText={formErrors.capacity}
+                variant="outlined"
                 InputProps={{ inputProps: { min: 1 } }}
               />
             </Grid>
+            <Grid item xs={12}>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                After creating a class, you can set up the schedule from the Schedule page.
+              </Typography>
+            </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowForm(false)}>Cancel</Button>
+        <DialogActions sx={{ px: 3, py: 2, bgcolor: 'background.default' }}>
+          <Button onClick={() => setShowForm(false)} variant="outlined">
+            Cancel
+          </Button>
           <Button 
             onClick={handleFormSubmit} 
             variant="contained" 
             color="primary"
-            disabled={!currentClass?.name || !currentClass?.coachId}
           >
-            Save
+            {isNew ? 'Create Class' : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>

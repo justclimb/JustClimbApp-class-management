@@ -24,6 +24,7 @@ import {
 } from '@devexpress/dx-react-scheduler';
 import { schedulesApi, classesApi, coachesApi } from '../services/api';
 import { ClassSchedule, Class, Coach } from '../types';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 // Add exDate property to ClassSchedule for handling recurring exceptions
 interface ExtendedClassSchedule extends ClassSchedule {
@@ -399,30 +400,6 @@ const SchedulePage: React.FC = () => {
     }
   };
 
-  // Custom form for recurrence rule 
-  const rRuleHelperText = (
-    <Box>
-      <Typography variant="caption">
-        For recurring classes, use standard RRULE format or leave empty for single class.
-      </Typography>
-      <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-        Examples:
-      </Typography>
-      <Typography variant="caption" sx={{ display: 'block' }}>
-        • Weekly on Mon, Wed, Fri: <code>FREQ=WEEKLY;BYDAY=MO,WE,FR</code>
-      </Typography>
-      <Typography variant="caption" sx={{ display: 'block' }}>
-        • Every 2 weeks: <code>FREQ=WEEKLY;INTERVAL=2</code>
-      </Typography>
-      <Typography variant="caption" sx={{ display: 'block' }}>
-        • Monthly on the 1st: <code>FREQ=MONTHLY;BYMONTHDAY=1</code>
-      </Typography>
-      <Typography variant="caption" sx={{ display: 'block' }}>
-        • Until Dec 31, 2025: Add <code>;UNTIL=20251231T000000Z</code>
-      </Typography>
-    </Box>
-  );
-
   // Convert schedules to appointments format
   const appointments = schedules
     // Filter out null or undefined schedules
@@ -508,10 +485,20 @@ const SchedulePage: React.FC = () => {
       </Paper>
 
       {/* Custom Appointment Form */}
-      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="md" fullWidth>
-        <DialogTitle>{isNew ? 'Add New Schedule' : 'Edit Schedule'}</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
+      <Dialog 
+        open={showForm} 
+        onClose={() => setShowForm(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2, boxShadow: 24 }
+        }}
+      >
+        <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', py: 2 }}>
+          {isNew ? 'Add New Class Schedule' : 'Edit Class Schedule'}
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Grid container spacing={3} sx={{ mt: 0 }}>
             <Grid item xs={12}>
               <TextField
                 select
@@ -521,10 +508,13 @@ const SchedulePage: React.FC = () => {
                 value={formData.classId || ''}
                 onChange={handleClassChange}
                 required
+                variant="outlined"
+                error={!formData.classId}
+                helperText={!formData.classId ? "Please select a class" : ""}
               >
                 {classes.map((classItem) => (
                   <MenuItem key={classItem.id} value={classItem.id}>
-                    {classItem.name} - Room: {classItem.room}
+                    {classItem.name} - Room: {classItem.room} (Coach: {getCoachName(classItem.id)})
                   </MenuItem>
                 ))}
               </TextField>
@@ -540,6 +530,9 @@ const SchedulePage: React.FC = () => {
                 onChange={(e) => handleDateChange('startDate', new Date(e.target.value))}
                 InputLabelProps={{ shrink: true }}
                 required
+                variant="outlined"
+                error={!formData.startDate}
+                helperText={!formData.startDate ? "Start date and time is required" : ""}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -553,6 +546,9 @@ const SchedulePage: React.FC = () => {
                 onChange={(e) => handleDateChange('endDate', new Date(e.target.value))}
                 InputLabelProps={{ shrink: true }}
                 required
+                variant="outlined"
+                error={!formData.endDate}
+                helperText={!formData.endDate ? "End date and time is required" : formData.startDate && formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate) ? "End time must be after start time" : ""}
               />
             </Grid>
             <Grid item xs={12}>
@@ -563,6 +559,7 @@ const SchedulePage: React.FC = () => {
                 value={formData.title || ''}
                 onChange={handleInputChange}
                 placeholder="Leave blank to use class name"
+                variant="outlined"
               />
             </Grid>
             <Grid item xs={12}>
@@ -574,35 +571,79 @@ const SchedulePage: React.FC = () => {
                 onChange={handleInputChange}
                 multiline
                 rows={3}
+                variant="outlined"
               />
             </Grid>
             <Grid item xs={12}>
+              <Typography variant="subtitle1" gutterBottom component="div" sx={{ mt: 1 }}>
+                Recurrence Pattern (Optional)
+              </Typography>
               <TextField
                 fullWidth
-                label="Recurrence Rule (RRULE format, optional)"
+                label="Recurrence Rule (RRULE format)"
                 name="rRule"
                 value={formData.rRule || ''}
                 onChange={handleInputChange}
                 placeholder="e.g. FREQ=WEEKLY;BYDAY=MO,WE,FR"
-                helperText={rRuleHelperText}
-                multiline
+                variant="outlined"
+                sx={{ mb: 1 }}
               />
+              <Box sx={{ bgcolor: 'info.50', p: 2, borderRadius: 1 }}>
+                <Typography variant="caption" component="div" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  Quick Reference for Recurrence Rules:
+                </Typography>
+                <Grid container spacing={1}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" display="block">
+                      • <b>Weekly on Mon, Wed, Fri:</b><br/>
+                      <code>FREQ=WEEKLY;BYDAY=MO,WE,FR</code>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" display="block">
+                      • <b>Every 2 weeks:</b><br/>
+                      <code>FREQ=WEEKLY;INTERVAL=2</code>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" display="block">
+                      • <b>Monthly on the 1st:</b><br/>
+                      <code>FREQ=MONTHLY;BYMONTHDAY=1</code>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" display="block">
+                      • <b>Until Dec 31, 2025:</b><br/>
+                      Add <code>;UNTIL=20251231T000000Z</code>
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
             </Grid>
             {formData.rRule && !isNew && (
               <Grid item xs={12}>
-                <Typography variant="body2" color="primary">
-                  You are editing a recurring class. Changes will affect all instances of this class.
-                </Typography>
+                <Box sx={{ bgcolor: 'warning.100', p: 2, borderRadius: 1 }}>
+                  <Typography variant="body2" color="warning.dark">
+                    <b>Warning:</b> You are editing a recurring class. Changes will affect all instances of this class.
+                  </Typography>
+                </Box>
               </Grid>
             )}
           </Grid>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowForm(false)}>Cancel</Button>
+        <DialogActions sx={{ px: 3, py: 2, bgcolor: 'background.default' }}>
+          <Button 
+            onClick={() => setShowForm(false)} 
+            variant="outlined"
+          >
+            Cancel
+          </Button>
           {!isNew && (
             <Button 
               onClick={() => handleDeleteAppointment(formData.id!)} 
               color="error"
+              variant="outlined"
+              startIcon={<DeleteIcon />}
             >
               Delete
             </Button>
@@ -611,9 +652,10 @@ const SchedulePage: React.FC = () => {
             onClick={handleFormSubmit} 
             variant="contained" 
             color="primary"
-            disabled={!formData.classId || !formData.startDate || !formData.endDate}
+            disabled={!formData.classId || !formData.startDate || !formData.endDate || 
+                      (formData.startDate && formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate))}
           >
-            Save
+            {isNew ? 'Create Schedule' : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>

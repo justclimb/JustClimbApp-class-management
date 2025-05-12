@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Paper, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid, Chip, IconButton } from '@mui/material';
+import { Typography, Paper, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid, Chip } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import {
   Grid as DataGrid,
   Table,
   TableHeaderRow,
-  TableEditRow,
   TableEditColumn,
   PagingPanel,
 } from '@devexpress/dx-react-grid-material-ui';
@@ -68,6 +67,7 @@ const CoachesPage: React.FC = () => {
   const [currentCoach, setCurrentCoach] = useState<Partial<Coach> | null>(null);
   const [isNew, setIsNew] = useState(true);
   const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Grid columns
   const columns = [
@@ -84,24 +84,49 @@ const CoachesPage: React.FC = () => {
   const dateColumns = ['hireDate'];
   const classesColumns = ['classes'];
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [coachesData, classesData] = await Promise.all([
-          coachesApi.getAll(),
-          classesApi.getAll()
-        ]);
-        setCoaches(coachesData);
-        setClasses(classesData);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchData = async () => {
+    try {
+      const [coachesData, classesData] = await Promise.all([
+        coachesApi.getAll(),
+        classesApi.getAll()
+      ]);
+      setCoaches(coachesData);
+      setClasses(classesData);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchData();
   }, []);
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    
+    if (!currentCoach?.firstName?.trim()) {
+      errors.firstName = 'First name is required';
+    }
+    
+    if (!currentCoach?.lastName?.trim()) {
+      errors.lastName = 'Last name is required';
+    }
+    
+    if (!currentCoach?.email?.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(currentCoach.email)) {
+      errors.email = 'Email is invalid';
+    }
+    
+    if (!currentCoach?.specialization?.trim()) {
+      errors.specialization = 'Specialization is required';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleAddCoach = () => {
     setIsNew(true);
@@ -115,6 +140,7 @@ const CoachesPage: React.FC = () => {
       classes: []
     });
     setSelectedClasses([]);
+    setFormErrors({});
     setShowForm(true);
   };
 
@@ -124,6 +150,7 @@ const CoachesPage: React.FC = () => {
       setIsNew(false);
       setCurrentCoach({ ...coachToEdit });
       setSelectedClasses([...coachToEdit.classes]);
+      setFormErrors({});
       setShowForm(true);
     }
   };
@@ -146,6 +173,10 @@ const CoachesPage: React.FC = () => {
 
   const handleFormSubmit = async () => {
     if (!currentCoach) return;
+
+    if (!validateForm()) {
+      return;
+    }
 
     // Update the classes array with selected classes
     const coachData = {
@@ -175,11 +206,22 @@ const CoachesPage: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setCurrentCoach(prev => {
+      if (!prev) return null;
+      
       if (name === 'hireDate') {
         return { ...prev, [name]: new Date(value) };
       }
       return { ...prev, [name]: value };
     });
+    
+    // Clear error for this field if it exists
+    if (formErrors[name]) {
+      setFormErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
   };
 
   const handleClassToggle = (classId: number) => {
@@ -187,6 +229,13 @@ const CoachesPage: React.FC = () => {
       setSelectedClasses(selectedClasses.filter(id => id !== classId));
     } else {
       setSelectedClasses([...selectedClasses, classId]);
+    }
+  };
+
+  // Handle DevExpress grid edit/delete actions
+  const commitChanges = ({ deleted }: any) => {
+    if (deleted) {
+      handleDeleteCoach(deleted[0]);
     }
   };
 
@@ -215,15 +264,15 @@ const CoachesPage: React.FC = () => {
           rows={coaches}
           columns={columns}
         >
-          <EditingState 
-            onCommitChanges={() => {}}
-          />
           <SortingState
             defaultSorting={[{ columnName: 'id', direction: 'asc' }]}
           />
           <IntegratedSorting />
           <PagingState defaultCurrentPage={0} pageSize={10} />
           <IntegratedPaging />
+          <EditingState 
+            onCommitChanges={commitChanges}
+          />
           <Table />
           <TableHeaderRow showSortingControls />
           <DateTypeProvider for={dateColumns} />
@@ -243,9 +292,14 @@ const CoachesPage: React.FC = () => {
               };
 
               return (
-                <IconButton onClick={handleClick} size="small">
-                  {id === 'edit' ? <EditIcon /> : <DeleteIcon />}
-                </IconButton>
+                <Button
+                  size="small"
+                  color={id === 'delete' ? 'error' : 'primary'}
+                  onClick={handleClick}
+                  startIcon={id === 'edit' ? <EditIcon /> : <DeleteIcon />}
+                >
+                  {id === 'edit' ? 'Edit' : 'Delete'}
+                </Button>
               );
             }}
           />
@@ -254,20 +308,33 @@ const CoachesPage: React.FC = () => {
       </Paper>
 
       {/* Form Dialog */}
-      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="md" fullWidth>
-        <DialogTitle>{isNew ? 'Add New Coach' : 'Edit Coach'}</DialogTitle>
-        <DialogContent>
+      <Dialog 
+        open={showForm} 
+        onClose={() => setShowForm(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2, boxShadow: 24 }
+        }}
+      >
+        <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', py: 2 }}>
+          {isNew ? 'Add New Coach' : 'Edit Coach'}
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
           <Box component="form" sx={{ mt: 1 }}>
-            <Grid container spacing={2}>
+            <Grid container spacing={3}>
               <Grid item xs={12} sm={6}>
                 <TextField
                   name="firstName"
                   label="First Name"
                   fullWidth
-                  margin="normal"
                   value={currentCoach?.firstName || ''}
                   onChange={handleInputChange}
                   required
+                  error={!!formErrors.firstName}
+                  helperText={formErrors.firstName}
+                  variant="outlined"
+                  autoFocus
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -275,10 +342,12 @@ const CoachesPage: React.FC = () => {
                   name="lastName"
                   label="Last Name"
                   fullWidth
-                  margin="normal"
                   value={currentCoach?.lastName || ''}
                   onChange={handleInputChange}
                   required
+                  error={!!formErrors.lastName}
+                  helperText={formErrors.lastName}
+                  variant="outlined"
                 />
               </Grid>
               <Grid item xs={12}>
@@ -287,10 +356,12 @@ const CoachesPage: React.FC = () => {
                   label="Email"
                   type="email"
                   fullWidth
-                  margin="normal"
                   value={currentCoach?.email || ''}
                   onChange={handleInputChange}
                   required
+                  error={!!formErrors.email}
+                  helperText={formErrors.email}
+                  variant="outlined"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -298,9 +369,9 @@ const CoachesPage: React.FC = () => {
                   name="phone"
                   label="Phone"
                   fullWidth
-                  margin="normal"
                   value={currentCoach?.phone || ''}
                   onChange={handleInputChange}
+                  variant="outlined"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -308,10 +379,12 @@ const CoachesPage: React.FC = () => {
                   name="specialization"
                   label="Specialization"
                   fullWidth
-                  margin="normal"
                   value={currentCoach?.specialization || ''}
                   onChange={handleInputChange}
                   required
+                  error={!!formErrors.specialization}
+                  helperText={formErrors.specialization}
+                  variant="outlined"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -320,57 +393,72 @@ const CoachesPage: React.FC = () => {
                   label="Hire Date"
                   type="date"
                   fullWidth
-                  margin="normal"
                   value={currentCoach?.hireDate
                     ? new Date(currentCoach.hireDate).toISOString().slice(0, 10)
                     : ''}
                   onChange={handleInputChange}
                   InputLabelProps={{ shrink: true }}
+                  variant="outlined"
                 />
               </Grid>
             </Grid>
 
             {/* Class selection */}
-            <Typography variant="h6" sx={{ mt: 2 }}>
+            <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
               Assigned Classes
             </Typography>
-            <Grid container spacing={1} sx={{ mt: 1 }}>
-              {classes.map((classItem) => {
-                const isAssignedInBackend = classItem.coachId === currentCoach?.id;
-                const isAssignedInState = selectedClasses.includes(classItem.id);
-                const isDisabled = isAssignedInBackend && !isAssignedInState;
+            <Box sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1, bgcolor: 'background.paper' }}>
+              <Grid container spacing={1}>
+                {classes.length > 0 ? (
+                  classes.map((classItem) => {
+                    const isAssignedInBackend = classItem.coachId === currentCoach?.id;
+                    const isAssignedInState = selectedClasses.includes(classItem.id);
+                    const isDisabled = isAssignedInBackend && !isAssignedInState;
 
-                return (
-                  <Grid item key={classItem.id}>
-                    <Chip
-                      label={classItem.name}
-                      color={isAssignedInState ? "primary" : "default"}
-                      onClick={() => handleClassToggle(classItem.id)}
-                      disabled={isDisabled}
-                    />
+                    return (
+                      <Grid item key={classItem.id}>
+                        <Chip
+                          label={classItem.name}
+                          color={isAssignedInState ? "primary" : "default"}
+                          onClick={() => handleClassToggle(classItem.id)}
+                          disabled={isDisabled}
+                          sx={{ m: 0.5 }}
+                        />
+                      </Grid>
+                    );
+                  })
+                ) : (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">
+                      No classes available
+                    </Typography>
                   </Grid>
-                );
-              })}
-            </Grid>
+                )}
+              </Grid>
 
-            {/* Warning for classes that can't be unassigned */}
-            {classes.some(c => c.coachId === currentCoach?.id) && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                Note: Classes that are directly assigned to this coach in the class settings cannot be unassigned here.
-                You need to modify the class settings to change those assignments.
-              </Typography>
-            )}
+              {/* Warning for classes that can't be unassigned */}
+              {classes.some(c => c.coachId === currentCoach?.id) && (
+                <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 2 }}>
+                  Note: Classes that are directly assigned to this coach in the class settings cannot be unassigned here.
+                  You need to modify the class settings to change those assignments.
+                </Typography>
+              )}
+            </Box>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowForm(false)}>Cancel</Button>
+        <DialogActions sx={{ px: 3, py: 2, bgcolor: 'background.default' }}>
+          <Button 
+            onClick={() => setShowForm(false)} 
+            variant="outlined"
+          >
+            Cancel
+          </Button>
           <Button
             onClick={handleFormSubmit}
             variant="contained"
             color="primary"
-            disabled={!currentCoach?.firstName || !currentCoach?.lastName || !currentCoach?.email || !currentCoach?.specialization}
           >
-            Save
+            {isNew ? 'Create Coach' : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>
