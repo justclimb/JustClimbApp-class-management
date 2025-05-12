@@ -632,18 +632,16 @@ const SchedulePage: React.FC = () => {
             }]}
           />
           
-          {/* GroupingState must be defined regardless of groupByCoach state */}
-          <GroupingState
-            grouping={groupByCoach ? [{ resourceName: 'coachId' }] : []}
-          />
-
-          {/* These components require GroupingState to be defined first */}
-          {groupByCoach && (
+          {/* Only include GroupingState and related components when groupByCoach is true */}
+          {groupByCoach ? (
             <>
+              <GroupingState
+                grouping={[{ resourceName: 'coachId' }]}
+              />
               <IntegratedGrouping />
               <GroupingPanel />
             </>
-          )}
+          ) : null}
           
           {/* EditRecurrenceMenu must come before DragDropProvider */}
           <EditRecurrenceMenu />
