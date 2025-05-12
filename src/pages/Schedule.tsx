@@ -557,10 +557,10 @@ const SchedulePage: React.FC = () => {
     fieldName: 'coachId',
     title: 'Coach',
     instances: coaches && coaches.length > 0 
-      ? coaches.map(coach => ({
+      ? coaches?.map(coach => ({
           id: coach?.id || 0,
           text: coach ? `${coach.firstName || ''} ${coach.lastName || ''}`.trim() : 'Unknown Coach'
-        }))
+        })) || []
       : [{ id: 0, text: 'No Coaches Available' }],
     allowMultiple: false,
   }];
@@ -632,19 +632,16 @@ const SchedulePage: React.FC = () => {
             }]}
           />
           
-          {/* GroupingState must always be included before IntegratedGrouping and GroupingPanel,
-              but we can conditionally set the grouping prop */}
-          <GroupingState
-            grouping={groupByCoach ? [{ resourceName: 'coachId' }] : []}
-          />
-          
-          {/* Only include IntegratedGrouping and GroupingPanel when groupByCoach is true */}
-          {groupByCoach && (
+          {/* Only include GroupingState when groupByCoach is true */}
+          {groupByCoach ? (
             <>
+              <GroupingState
+                grouping={[{ resourceName: 'coachId' }]}
+              />
               <IntegratedGrouping />
               <GroupingPanel />
             </>
-          )}
+          ) : null}
           
           {/* EditRecurrenceMenu must come before DragDropProvider */}
           <EditRecurrenceMenu />
