@@ -424,22 +424,31 @@ const SchedulePage: React.FC = () => {
   );
 
   // Convert schedules to appointments format
-  const appointments = schedules.map(schedule => {
-    if (!schedule || schedule.classId === undefined) {
-      console.warn('Invalid schedule data found:', schedule);
-      return null;
-    }
-    return {
-      id: schedule.id,
-      classId: schedule.classId,
-      startDate: schedule.startDate ? new Date(schedule.startDate) : new Date(),
-      endDate: schedule.endDate ? new Date(schedule.endDate) : new Date(),
-      title: schedule.title || getClassName(schedule.classId),
-      notes: schedule.notes,
-      rRule: schedule.rRule,
-      exDate: schedule.exDate
-    };
-  }).filter(Boolean) as AppointmentModel[];
+  const appointments = schedules
+    .filter(schedule => schedule !== null && schedule !== undefined)
+    .map(schedule => {
+      if (!schedule || typeof schedule !== 'object' || schedule.classId === undefined) {
+        console.warn('Invalid schedule data found:', schedule);
+        return null;
+      }
+      
+      try {
+        return {
+          id: schedule.id,
+          classId: schedule.classId,
+          startDate: schedule.startDate ? new Date(schedule.startDate) : new Date(),
+          endDate: schedule.endDate ? new Date(schedule.endDate) : new Date(),
+          title: schedule.title || getClassName(schedule.classId),
+          notes: schedule.notes || '',
+          rRule: schedule.rRule || undefined,
+          exDate: schedule.exDate || undefined
+        };
+      } catch (error) {
+        console.error('Error converting schedule to appointment:', error, schedule);
+        return null;
+      }
+    })
+    .filter(Boolean) as AppointmentModel[];
 
   if (loading) {
     return <Typography>Loading schedule data...</Typography>;
