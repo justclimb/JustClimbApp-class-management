@@ -619,7 +619,10 @@ const SchedulePage: React.FC = () => {
           <TodayButton />
           <ViewSwitcher />
           
-          {/* Resources must come before GroupingState */}
+          {/* Appointments must come before Resources */}
+          <Appointments appointmentComponent={Appointment} />
+          
+          {/* Resources now comes after Appointments */}
           <Resources
             data={resources || [{ 
               fieldName: 'coachId',
@@ -650,9 +653,6 @@ const SchedulePage: React.FC = () => {
           
           {/* Support for all-day appointments */}
           <AllDayPanel />
-          
-          {/* Appointments should come after Resources for proper rendering */}
-          <Appointments appointmentComponent={Appointment} />
           
           <EditRecurrenceMenu />
           <ConfirmationDialog />
