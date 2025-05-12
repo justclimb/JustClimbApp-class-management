@@ -12,18 +12,26 @@ import {
   ViewSwitcher,
   AppointmentForm,
   AppointmentTooltip,
+  ConfirmationDialog,
+  EditRecurrenceMenu,
 } from '@devexpress/dx-react-scheduler-material-ui';
 import {
   ViewState,
   EditingState,
   IntegratedEditing,
+  AppointmentModel,
+  ChangeSet,
 } from '@devexpress/dx-react-scheduler';
 import { schedulesApi, classesApi, teachersApi } from '../services/api';
 import { ClassSchedule, Class, Teacher } from '../types';
-import RecurringClassForm from '../components/RecurringClassForm';
+
+// Add exDate property to ClassSchedule for handling recurring exceptions
+interface ExtendedClassSchedule extends ClassSchedule {
+  exDate?: string;
+}
 
 const SchedulePage: React.FC = () => {
-  const [schedules, setSchedules] = useState<ClassSchedule[]>([]);
+  const [schedules, setSchedules] = useState<ExtendedClassSchedule[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,11 +40,8 @@ const SchedulePage: React.FC = () => {
 
   // State for custom appointment form
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<Partial<ClassSchedule>>({});
+  const [formData, setFormData] = useState<Partial<ExtendedClassSchedule>>({});
   const [isNew, setIsNew] = useState(true);
-
-  // Add state for recurring class form
-  const [showRecurringForm, setShowRecurringForm] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -201,6 +206,8 @@ const SchedulePage: React.FC = () => {
         endDate: appointmentData.endDate,
         title: appointmentData.title,
         notes: appointmentData.notes,
+        rRule: appointmentData.rRule,
+        exDate: appointmentData.exDate,
       });
     } else {
       // Create new appointment
@@ -223,12 +230,66 @@ const SchedulePage: React.FC = () => {
     setShowForm(true);
   };
 
+  // Handle commit changes
+  const commitChanges = async ({ added, changed, deleted }: ChangeSet) => {
+    try {
+      let updatedSchedules = [...schedules];
+
+      if (added) {
+        // For recurrence handling, we'll use the DevExpress scheduler's built-in functionality
+        const newSchedule = await schedulesApi.create(added as Omit<ExtendedClassSchedule, 'id'>);
+        updatedSchedules = [...updatedSchedules, newSchedule];
+      }
+
+      if (changed) {
+        const changedAppointment = Object.keys(changed)[0];
+        const appointmentIndex = updatedSchedules.findIndex(
+          appointment => appointment.id === parseInt(changedAppointment)
+        );
+        
+        if (appointmentIndex > -1) {
+          const updatedAppointment = {
+            ...updatedSchedules[appointmentIndex],
+            ...changed[changedAppointment]
+          };
+          
+          const result = await schedulesApi.update(
+            updatedAppointment.id, 
+            updatedAppointment
+          );
+          
+          if (result) {
+            updatedSchedules = [
+              ...updatedSchedules.slice(0, appointmentIndex),
+              updatedAppointment,
+              ...updatedSchedules.slice(appointmentIndex + 1)
+            ];
+          }
+        }
+      }
+
+      if (deleted !== undefined) {
+        const success = await schedulesApi.delete(deleted as number);
+        if (success) {
+          updatedSchedules = updatedSchedules.filter(
+            appointment => appointment.id !== deleted
+          );
+        }
+      }
+
+      setSchedules(updatedSchedules);
+    } catch (error) {
+      console.error('Error managing schedule:', error);
+      alert('Error updating schedule');
+    }
+  };
+
   // Handle form submission
   const handleFormSubmit = async () => {
     try {
       if (isNew) {
         // Create new schedule
-        const newSchedule = await schedulesApi.create(formData as Omit<ClassSchedule, 'id'>);
+        const newSchedule = await schedulesApi.create(formData as Omit<ExtendedClassSchedule, 'id'>);
         setSchedules([...schedules, newSchedule]);
       } else {
         // Update existing schedule
@@ -296,26 +357,10 @@ const SchedulePage: React.FC = () => {
       endDate: schedule.endDate ? new Date(schedule.endDate) : new Date(),
       title: schedule.title || getClassName(schedule.classId),
       notes: schedule.notes,
-      rRule: schedule.rRule
+      rRule: schedule.rRule,
+      exDate: schedule.exDate
     };
-  }).filter(Boolean) as any[];
-
-  const handleSaveRecurringClasses = async (schedules: Omit<ClassSchedule, 'id'>[]) => {
-    try {
-      // Save all schedules
-      const savePromises = schedules.map(schedule => schedulesApi.create(schedule));
-      await Promise.all(savePromises);
-      
-      // Refresh schedules data
-      const schedulesData = await schedulesApi.getAll();
-      setSchedules(schedulesData);
-      
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Error saving recurring schedules:', error);
-      return Promise.reject(error);
-    }
-  };
+  }).filter(Boolean) as AppointmentModel[];
 
   if (loading) {
     return <Typography>Loading schedule data...</Typography>;
@@ -327,22 +372,13 @@ const SchedulePage: React.FC = () => {
         <Typography variant="h4" component="h1">
           Schedule Management
         </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button 
-            variant="outlined" 
-            color="primary"
-            onClick={() => setShowRecurringForm(true)}
-          >
-            Add Recurring Classes
-          </Button>
-          <Button 
-            variant="contained" 
-            color="primary"
-            onClick={() => handleOpenForm()}
-          >
-            Add Single Class
-          </Button>
-        </Box>
+        <Button 
+          variant="contained" 
+          color="primary"
+          onClick={() => handleOpenForm()}
+        >
+          Add Class
+        </Button>
       </Box>
 
       <Paper>
@@ -354,22 +390,7 @@ const SchedulePage: React.FC = () => {
             onCurrentViewNameChange={handleCurrentViewNameChange}
           />
           <EditingState
-            onCommitChanges={({ added, changed, deleted }) => {
-              if (deleted !== undefined) {
-                handleDeleteAppointment(deleted as number);
-              } else if (added !== undefined) {
-                handleOpenForm(added);
-              } else if (changed !== undefined) {
-                const id = Object.keys(changed)[0];
-                const appointment = appointments.find(a => a.id === parseInt(id));
-                if (appointment) {
-                  handleOpenForm({
-                    ...appointment,
-                    ...changed[id],
-                  });
-                }
-              }
-            }}
+            onCommitChanges={commitChanges}
           />
           <IntegratedEditing />
 
@@ -387,6 +408,9 @@ const SchedulePage: React.FC = () => {
             showDeleteButton
             contentComponent={AppointmentContent}
           />
+          <AppointmentForm />
+          <ConfirmationDialog />
+          <EditRecurrenceMenu />
         </Scheduler>
       </Paper>
 
@@ -459,6 +483,17 @@ const SchedulePage: React.FC = () => {
                 rows={3}
               />
             </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Recurrence Rule (RRULE format, optional)"
+                name="rRule"
+                value={formData.rRule || ''}
+                onChange={handleInputChange}
+                placeholder="e.g. FREQ=WEEKLY;BYDAY=MO,WE,FR"
+                helperText="For recurring classes. Use standard RRULE format or leave empty for single class."
+              />
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
@@ -481,14 +516,6 @@ const SchedulePage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Recurring Class Form */}
-      <RecurringClassForm
-        open={showRecurringForm}
-        onClose={() => setShowRecurringForm(false)}
-        classes={classes}
-        onSave={handleSaveRecurringClasses}
-      />
     </div>
   );
 };
