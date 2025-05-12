@@ -482,8 +482,8 @@ const SchedulePage: React.FC = () => {
           <TodayButton />
           <ViewSwitcher />
           <Appointments appointmentComponent={Appointment} />
-          <ConfirmationDialog />
           <EditRecurrenceMenu />
+          <ConfirmationDialog />
           <AppointmentTooltip
             showOpenButton
             showDeleteButton
