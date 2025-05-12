@@ -622,6 +622,8 @@ const SchedulePage: React.FC = () => {
           <TodayButton />
           <ViewSwitcher />
           
+          <Appointments appointmentComponent={Appointment} />
+          
           <Resources
             data={resources}
           />
@@ -630,7 +632,6 @@ const SchedulePage: React.FC = () => {
             <GroupingPanel />
           )}
           
-          <Appointments appointmentComponent={Appointment} />
           <EditRecurrenceMenu />
           <ConfirmationDialog />
           <AppointmentTooltip
