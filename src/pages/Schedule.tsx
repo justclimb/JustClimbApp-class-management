@@ -622,11 +622,13 @@ const SchedulePage: React.FC = () => {
             data={resources}
           />
           
+          {/* GroupingState must come before IntegratedGrouping and GroupingPanel */}
+          <GroupingState
+            grouping={groupByCoach ? [{ resourceName: 'coachId' }] : []}
+          />
+
           {groupByCoach && (
             <>
-              <GroupingState
-                grouping={[{ resourceName: 'coachId' }]}
-              />
               <IntegratedGrouping />
               <GroupingPanel />
             </>
