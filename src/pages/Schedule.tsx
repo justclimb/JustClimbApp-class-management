@@ -56,13 +56,15 @@ const SchedulePage: React.FC = () => {
   }, []);
 
   // Get class name by ID
-  const getClassName = (classId: number): string => {
+  const getClassName = (classId?: number): string => {
+    if (classId === undefined || classId === null) return 'Unknown Class';
     const classItem = classes.find(c => c.id === classId);
     return classItem ? classItem.name : 'Unknown Class';
   };
 
   // Get teacher name by class ID
-  const getTeacherName = (classId: number): string => {
+  const getTeacherName = (classId?: number): string => {
+    if (classId === undefined || classId === null) return 'Unknown Teacher';
     const classItem = classes.find(c => c.id === classId);
     if (!classItem) return 'Unknown Teacher';
 
@@ -81,6 +83,23 @@ const SchedulePage: React.FC = () => {
 
   // Custom appointment component
   const Appointment = ({ children, data, ...restProps }: any) => {
+    // Add a safety check for data being undefined
+    if (!data || data.classId === undefined) {
+      return (
+        <Appointments.Appointment
+          {...restProps}
+          style={{
+            backgroundColor: '#757575',
+            borderRadius: '4px',
+          }}
+        >
+          <div style={{ padding: '2px 8px', color: 'white' }}>
+            <strong>Invalid Appointment</strong>
+          </div>
+        </Appointments.Appointment>
+      );
+    }
+
     const classItem = classes.find(c => c.id === data.classId);
     return (
       <Appointments.Appointment
@@ -102,6 +121,15 @@ const SchedulePage: React.FC = () => {
 
   // Custom tooltip component
   const AppointmentContent = ({ children, data, ...restProps }: any) => {
+    // Add a safety check for data being undefined
+    if (!data || data.classId === undefined) {
+      return (
+        <AppointmentTooltip.Content {...restProps}>
+          <Typography>No appointment data available</Typography>
+        </AppointmentTooltip.Content>
+      );
+    }
+
     const classItem = classes.find(c => c.id === data.classId);
     const teacher = classItem 
       ? teachers.find(t => t.id === classItem.teacherId)
@@ -137,7 +165,7 @@ const SchedulePage: React.FC = () => {
 
   // Handle open form for editing
   const handleOpenForm = (appointmentData?: any) => {
-    if (appointmentData) {
+    if (appointmentData && appointmentData.id !== undefined) {
       // Edit existing appointment
       setIsNew(false);
       setFormData({
@@ -230,14 +258,20 @@ const SchedulePage: React.FC = () => {
   };
 
   // Convert schedules to appointments format
-  const appointments = schedules.map(schedule => ({
-    id: schedule.id,
-    classId: schedule.classId,
-    startDate: new Date(schedule.startDate),
-    endDate: new Date(schedule.endDate),
-    title: schedule.title || getClassName(schedule.classId),
-    notes: schedule.notes,
-  }));
+  const appointments = schedules.map(schedule => {
+    if (!schedule || schedule.classId === undefined) {
+      console.warn('Invalid schedule data found:', schedule);
+      return null;
+    }
+    return {
+      id: schedule.id,
+      classId: schedule.classId,
+      startDate: schedule.startDate ? new Date(schedule.startDate) : new Date(),
+      endDate: schedule.endDate ? new Date(schedule.endDate) : new Date(),
+      title: schedule.title || getClassName(schedule.classId),
+      notes: schedule.notes,
+    };
+  }).filter(Boolean) as any[];
 
   if (loading) {
     return <Typography>Loading schedule data...</Typography>;
