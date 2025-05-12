@@ -606,20 +606,6 @@ const SchedulePage: React.FC = () => {
           />
           <IntegratedEditing />
           
-          {/* Resources must come before GroupingState and IntegratedGrouping */}
-          <Resources
-            data={resources}
-          />
-          
-          {groupByCoach && (
-            <>
-              <GroupingState
-                grouping={[{ resourceName: 'coachId' }]}
-              />
-              <IntegratedGrouping />
-            </>
-          )}
-
           <DayView startDayHour={8} endDayHour={21} />
           <WeekView startDayHour={8} endDayHour={21} />
           <MonthView />
@@ -631,8 +617,19 @@ const SchedulePage: React.FC = () => {
           
           <Appointments appointmentComponent={Appointment} />
           
+          {/* Resources comes after Appointments */}
+          <Resources
+            data={resources}
+          />
+          
           {groupByCoach && (
-            <GroupingPanel />
+            <>
+              <GroupingState
+                grouping={[{ resourceName: 'coachId' }]}
+              />
+              <IntegratedGrouping />
+              <GroupingPanel />
+            </>
           )}
           
           <EditRecurrenceMenu />
