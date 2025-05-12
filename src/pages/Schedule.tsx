@@ -22,8 +22,8 @@ import {
   AppointmentModel,
   ChangeSet,
 } from '@devexpress/dx-react-scheduler';
-import { schedulesApi, classesApi, teachersApi } from '../services/api';
-import { ClassSchedule, Class, Teacher } from '../types';
+import { schedulesApi, classesApi, coachesApi } from '../services/api';
+import { ClassSchedule, Class, Coach } from '../types';
 
 // Add exDate property to ClassSchedule for handling recurring exceptions
 interface ExtendedClassSchedule extends ClassSchedule {
@@ -33,7 +33,7 @@ interface ExtendedClassSchedule extends ClassSchedule {
 const SchedulePage: React.FC = () => {
   const [schedules, setSchedules] = useState<ExtendedClassSchedule[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [coaches, setCoaches] = useState<Coach[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentViewName, setCurrentViewName] = useState('Week');
@@ -46,14 +46,14 @@ const SchedulePage: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [schedulesData, classesData, teachersData] = await Promise.all([
+        const [schedulesData, classesData, coachesData] = await Promise.all([
           schedulesApi.getAll(),
           classesApi.getAll(),
-          teachersApi.getAll(),
+          coachesApi.getAll(),
         ]);
         setSchedules(schedulesData);
         setClasses(classesData);
-        setTeachers(teachersData);
+        setCoaches(coachesData);
       } catch (error) {
         console.error('Error fetching schedule data:', error);
       } finally {
@@ -71,14 +71,14 @@ const SchedulePage: React.FC = () => {
     return classItem ? classItem.name : 'Unknown Class';
   };
 
-  // Get teacher name by class ID
-  const getTeacherName = (classId?: number): string => {
-    if (classId === undefined || classId === null) return 'Unknown Teacher';
+  // Get coach name by class ID
+  const getCoachName = (classId?: number): string => {
+    if (classId === undefined || classId === null) return 'Unknown Coach';
     const classItem = classes.find(c => c.id === classId);
-    if (!classItem) return 'Unknown Teacher';
+    if (!classItem) return 'Unknown Coach';
 
-    const teacher = teachers.find(t => t.id === classItem.teacherId);
-    return teacher ? `${teacher.firstName} ${teacher.lastName}` : 'Unknown Teacher';
+    const coach = coaches.find(t => t.id === classItem.coachId);
+    return coach ? `${coach.firstName} ${coach.lastName}` : 'Unknown Coach';
   };
 
   // Handling scheduler views
@@ -148,7 +148,7 @@ const SchedulePage: React.FC = () => {
         )}
         <div style={{ padding: '2px 8px', color: 'white' }}>
           <strong>{data.title}</strong>
-          <div>Teacher: {getTeacherName(data.classId)}</div>
+          <div>Coach: {getCoachName(data.classId)}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Room: {classItem?.room || 'N/A'}</span>
           </div>
@@ -169,8 +169,8 @@ const SchedulePage: React.FC = () => {
     }
 
     const classItem = classes.find(c => c.id === data.classId);
-    const teacher = classItem 
-      ? teachers.find(t => t.id === classItem.teacherId)
+    const coach = classItem 
+      ? coaches.find(t => t.id === classItem.coachId)
       : null;
     
     // Check if this is a recurring class
@@ -182,9 +182,9 @@ const SchedulePage: React.FC = () => {
           <Grid item xs={4} sx={{ fontWeight: 'bold' }}>Class:</Grid>
           <Grid item xs={8}>{data.title}</Grid>
           
-          <Grid item xs={4} sx={{ fontWeight: 'bold' }}>Teacher:</Grid>
+          <Grid item xs={4} sx={{ fontWeight: 'bold' }}>Coach:</Grid>
           <Grid item xs={8}>
-            {teacher ? `${teacher.firstName} ${teacher.lastName}` : 'N/A'}
+            {coach ? `${coach.firstName} ${coach.lastName}` : 'N/A'}
           </Grid>
           
           <Grid item xs={4} sx={{ fontWeight: 'bold' }}>Room:</Grid>

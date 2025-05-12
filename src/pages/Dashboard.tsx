@@ -3,7 +3,7 @@ import { Grid, Paper, Typography, Box, Card, CardContent, CardHeader } from '@mu
 import { 
   Class as ClassIcon, 
   Person as StudentIcon, 
-  School as TeacherIcon,
+  School as CoachIcon,
   Event as EventIcon 
 } from '@mui/icons-material';
 import { dashboardApi } from '../services/api';
@@ -113,13 +113,13 @@ const Dashboard: React.FC = () => {
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <TeacherIcon sx={{ color: '#ff8f00', mr: 1 }} />
+              <CoachIcon sx={{ color: '#ff8f00', mr: 1 }} />
               <Typography variant="h6" component="div">
-                Teachers
+                Coaches
               </Typography>
             </Box>
             <Typography variant="h3" component="div">
-              {stats.totalTeachers}
+              {stats.totalCoaches}
             </Typography>
           </Paper>
         </Grid>

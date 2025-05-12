@@ -18,8 +18,8 @@ import {
   SortingState,
   IntegratedSorting,
 } from '@devexpress/dx-react-grid';
-import { classesApi, teachersApi } from '../services/api';
-import { Class, Teacher } from '../types';
+import { classesApi, coachesApi } from '../services/api';
+import { Class, Coach } from '../types';
 
 const getRowId = (row: Class) => row.id;
 
@@ -33,21 +33,21 @@ const DateTypeProvider: React.FC<DataTypeProviderProps> = (props) => (
 );
 
 // Teacher name formatter
-const TeacherFormatter: React.FC<DataTypeProvider.ValueFormatterProps & { teachers: Teacher[] }> = ({ value, teachers }) => {
-  const teacher = teachers.find(t => t.id === value);
-  return <>{teacher ? `${teacher.firstName} ${teacher.lastName}` : ''}</>;
+const CoachFormatter: React.FC<DataTypeProvider.ValueFormatterProps & { coaches: Coach[] }> = ({ value, coaches }) => {
+  const coach = coaches.find(t => t.id === value);
+  return <>{coach ? `${coach.firstName} ${coach.lastName}` : ''}</>;
 };
 
-const TeacherTypeProvider: React.FC<DataTypeProviderProps & { teachers: Teacher[] }> = ({ teachers, ...props }) => (
+const CoachTypeProvider: React.FC<DataTypeProviderProps & { coaches: Coach[] }> = ({ coaches, ...props }) => (
   <DataTypeProvider
-    formatterComponent={(formatterProps) => <TeacherFormatter teachers={teachers} {...formatterProps} />}
+    formatterComponent={(formatterProps) => <CoachFormatter coaches={coaches} {...formatterProps} />}
     {...props}
   />
 );
 
 const ClassesPage: React.FC = () => {
   const [classes, setClasses] = useState<Class[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [coaches, setCoaches] = useState<Coach[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [currentClass, setCurrentClass] = useState<Partial<Class> | null>(null);
@@ -56,23 +56,23 @@ const ClassesPage: React.FC = () => {
   const columns = [
     { name: 'name', title: 'Class Name' },
     { name: 'description', title: 'Description' },
-    { name: 'teacherId', title: 'Teacher' },
+    { name: 'coachId', title: 'Coach' },
     { name: 'capacity', title: 'Capacity' },
     { name: 'room', title: 'Room' }
   ];
 
   const dateColumns = ['startDate', 'endDate'];
-  const teacherColumns = ['teacherId'];
+  const coachColumns = ['coachId'];
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [classesData, teachersData] = await Promise.all([
+        const [classesData, coachesData] = await Promise.all([
           classesApi.getAll(),
-          teachersApi.getAll()
+          coachesApi.getAll()
         ]);
         setClasses(classesData);
-        setTeachers(teachersData);
+        setCoaches(coachesData);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -88,7 +88,7 @@ const ClassesPage: React.FC = () => {
     setCurrentClass({
       name: '',
       description: '',
-      teacherId: teachers.length > 0 ? teachers[0].id : 0,
+      coachId: coaches.length > 0 ? coaches[0].id : 0,
       studentIds: [],
       schedule: [],
       capacity: 20,
@@ -183,7 +183,7 @@ const ClassesPage: React.FC = () => {
           <PagingState defaultCurrentPage={0} pageSize={10} />
           <IntegratedPaging />
           <DateTypeProvider for={dateColumns} />
-          <TeacherTypeProvider for={teacherColumns} teachers={teachers} />
+          <CoachTypeProvider for={coachColumns} coaches={coaches} />
           <Table />
           <TableHeaderRow showSortingControls />
           <TableEditColumn
@@ -246,15 +246,15 @@ const ClassesPage: React.FC = () => {
               <TextField
                 select
                 fullWidth
-                label="Teacher"
-                name="teacherId"
-                value={currentClass?.teacherId || ''}
+                label="Coach"
+                name="coachId"
+                value={currentClass?.coachId || ''}
                 onChange={handleInputChange}
                 required
               >
-                {teachers.map((teacher) => (
-                  <MenuItem key={teacher.id} value={teacher.id}>
-                    {teacher.firstName} {teacher.lastName}
+                {coaches.map((coach) => (
+                  <MenuItem key={coach.id} value={coach.id}>
+                    {coach.firstName} {coach.lastName}
                   </MenuItem>
                 ))}
               </TextField>
@@ -289,7 +289,7 @@ const ClassesPage: React.FC = () => {
             onClick={handleFormSubmit} 
             variant="contained" 
             color="primary"
-            disabled={!currentClass?.name || !currentClass?.teacherId}
+            disabled={!currentClass?.name || !currentClass?.coachId}
           >
             Save
           </Button>

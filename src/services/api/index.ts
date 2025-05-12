@@ -1,5 +1,5 @@
-import { Student, Teacher, Class, ClassSchedule, Stats } from '../../types';
-import { students, teachers, classes, schedules, getDashboardStats } from './mockData';
+import { Student, Coach, Class, ClassSchedule, Stats } from '../../types';
+import { students, coaches, classes, schedules, stats } from './mockData';
 
 // Helper to generate new IDs
 const getNewId = (array: any[]): number => {
@@ -18,9 +18,10 @@ export const studentsApi = {
   },
   
   create: (student: Omit<Student, 'id'>): Promise<Student> => {
+    const newId = Math.max(0, ...students.map(s => s.id)) + 1;
     const newStudent = {
-      ...student,
-      id: getNewId(students)
+      id: newId,
+      ...student
     };
     students.push(newStudent);
     return Promise.resolve({ ...newStudent });
@@ -28,85 +29,79 @@ export const studentsApi = {
   
   update: (id: number, studentData: Partial<Student>): Promise<Student | undefined> => {
     const index = students.findIndex(s => s.id === id);
-    if (index === -1) return Promise.resolve(undefined);
-    
+    if (index === -1) {
+      return Promise.resolve(undefined);
+    }
     const updatedStudent = { ...students[index], ...studentData };
     students[index] = updatedStudent;
     return Promise.resolve({ ...updatedStudent });
   },
   
   delete: (id: number): Promise<boolean> => {
-    const initialLength = students.length;
-    const studentIndex = students.findIndex(s => s.id === id);
-    
-    if (studentIndex !== -1) {
-      students.splice(studentIndex, 1);
-      
-      // Remove student from classes
-      classes.forEach(classItem => {
-        const studentIdIndex = classItem.studentIds.indexOf(id);
-        if (studentIdIndex !== -1) {
-          classItem.studentIds.splice(studentIdIndex, 1);
-        }
-      });
+    const index = students.findIndex(s => s.id === id);
+    if (index === -1) {
+      return Promise.resolve(false);
     }
-    
-    return Promise.resolve(students.length < initialLength);
+    // Check if this student is enrolled in any class
+    const isEnrolled = classes.some(c => c.studentIds.includes(id));
+    if (isEnrolled) {
+      return Promise.resolve(false);
+    }
+    students.splice(index, 1);
+    return Promise.resolve(true);
   }
 };
 
-// Teachers API
-export const teachersApi = {
-  getAll: (): Promise<Teacher[]> => {
-    return Promise.resolve([...teachers]);
+// Coaches API
+export const coachesApi = {
+  getAll: (): Promise<Coach[]> => {
+    return Promise.resolve([...coaches]);
   },
   
-  getById: (id: number): Promise<Teacher | undefined> => {
-    const teacher = teachers.find(t => t.id === id);
-    return Promise.resolve(teacher ? { ...teacher } : undefined);
+  getById: (id: number): Promise<Coach | undefined> => {
+    const coach = coaches.find((t: Coach) => t.id === id);
+    return Promise.resolve(coach ? { ...coach } : undefined);
   },
   
-  create: (teacher: Omit<Teacher, 'id'>): Promise<Teacher> => {
-    const newTeacher = {
-      ...teacher,
-      id: getNewId(teachers)
+  create: (coach: Omit<Coach, 'id'>): Promise<Coach> => {
+    const newId = Math.max(0, ...coaches.map((t: Coach) => t.id)) + 1;
+    const newCoach = {
+      id: newId,
+      ...coach
     };
-    teachers.push(newTeacher);
-    return Promise.resolve({ ...newTeacher });
+    coaches.push(newCoach);
+    return Promise.resolve({ ...newCoach });
   },
   
-  update: (id: number, teacherData: Partial<Teacher>): Promise<Teacher | undefined> => {
-    const index = teachers.findIndex(t => t.id === id);
-    if (index === -1) return Promise.resolve(undefined);
-    
-    const updatedTeacher = { ...teachers[index], ...teacherData };
-    teachers[index] = updatedTeacher;
-    return Promise.resolve({ ...updatedTeacher });
+  update: (id: number, coachData: Partial<Coach>): Promise<Coach | undefined> => {
+    const index = coaches.findIndex((t: Coach) => t.id === id);
+    if (index === -1) {
+      return Promise.resolve(undefined);
+    }
+    const updatedCoach = { ...coaches[index], ...coachData };
+    coaches[index] = updatedCoach;
+    return Promise.resolve({ ...updatedCoach });
   },
   
   delete: (id: number): Promise<boolean> => {
-    const initialLength = teachers.length;
-    const teacherIndex = teachers.findIndex(t => t.id === id);
-    
-    if (teacherIndex !== -1) {
-      // Check if teacher is assigned to any classes
-      const assignedClasses = classes.filter(c => c.teacherId === id);
-      if (assignedClasses.length > 0) {
-        // Cannot delete a teacher assigned to classes
-        return Promise.resolve(false);
-      }
-      
-      teachers.splice(teacherIndex, 1);
+    const index = coaches.findIndex((t: Coach) => t.id === id);
+    if (index === -1) {
+      return Promise.resolve(false);
     }
-    
-    return Promise.resolve(teachers.length < initialLength);
+    // Check if this coach is assigned to any class
+    const isAssigned = classes.some(c => c.coachId === id);
+    if (isAssigned) {
+      return Promise.resolve(false);
+    }
+    coaches.splice(index, 1);
+    return Promise.resolve(true);
   }
 };
 
 // Classes API
 export const classesApi = {
   getAll: (): Promise<Class[]> => {
-    return Promise.resolve(classes.map(c => ({ ...c })));
+    return Promise.resolve([...classes]);
   },
   
   getById: (id: number): Promise<Class | undefined> => {
@@ -115,9 +110,10 @@ export const classesApi = {
   },
   
   create: (classData: Omit<Class, 'id'>): Promise<Class> => {
+    const newId = Math.max(0, ...classes.map(c => c.id)) + 1;
     const newClass = {
-      ...classData,
-      id: getNewId(classes)
+      id: newId,
+      ...classData
     };
     classes.push(newClass);
     return Promise.resolve({ ...newClass });
@@ -125,48 +121,29 @@ export const classesApi = {
   
   update: (id: number, classData: Partial<Class>): Promise<Class | undefined> => {
     const index = classes.findIndex(c => c.id === id);
-    if (index === -1) return Promise.resolve(undefined);
-    
+    if (index === -1) {
+      return Promise.resolve(undefined);
+    }
     const updatedClass = { ...classes[index], ...classData };
     classes[index] = updatedClass;
     return Promise.resolve({ ...updatedClass });
   },
   
   delete: (id: number): Promise<boolean> => {
-    const initialLength = classes.length;
-    const classIndex = classes.findIndex(c => c.id === id);
-    
-    if (classIndex !== -1) {
-      classes.splice(classIndex, 1);
-      
-      // Remove class schedules
-      const scheduleIndices = schedules
-        .map((s, index) => s.classId === id ? index : -1)
-        .filter(index => index !== -1)
-        .sort((a, b) => b - a); // Sort in descending order for accurate splicing
-      
-      scheduleIndices.forEach(index => {
-        schedules.splice(index, 1);
-      });
-      
-      // Remove class from students
-      students.forEach(student => {
-        const classIndex = student.classes.indexOf(id);
-        if (classIndex !== -1) {
-          student.classes.splice(classIndex, 1);
-        }
-      });
-      
-      // Remove class from teachers
-      teachers.forEach(teacher => {
-        const classIndex = teacher.classes.indexOf(id);
-        if (classIndex !== -1) {
-          teacher.classes.splice(classIndex, 1);
-        }
-      });
+    const index = classes.findIndex(c => c.id === id);
+    if (index === -1) {
+      return Promise.resolve(false);
     }
-    
-    return Promise.resolve(classes.length < initialLength);
+    // Delete any schedules associated with this class
+    const schedulesToDelete = schedules.filter(s => s.classId === id);
+    schedulesToDelete.forEach(schedule => {
+      const scheduleIndex = schedules.findIndex(s => s.id === schedule.id);
+      if (scheduleIndex !== -1) {
+        schedules.splice(scheduleIndex, 1);
+      }
+    });
+    classes.splice(index, 1);
+    return Promise.resolve(true);
   }
 };
 
@@ -176,19 +153,25 @@ export const schedulesApi = {
     return Promise.resolve([...schedules]);
   },
   
+  getById: (id: number): Promise<ClassSchedule | undefined> => {
+    const schedule = schedules.find(s => s.id === id);
+    return Promise.resolve(schedule ? { ...schedule } : undefined);
+  },
+  
   getByClassId: (classId: number): Promise<ClassSchedule[]> => {
     return Promise.resolve(schedules.filter(s => s.classId === classId).map(s => ({ ...s })));
   },
   
-  create: (schedule: Omit<ClassSchedule, 'id'>): Promise<ClassSchedule> => {
+  create: (scheduleData: Omit<ClassSchedule, 'id'>): Promise<ClassSchedule> => {
+    const newId = Math.max(0, ...schedules.map(s => s.id)) + 1;
     const newSchedule = {
-      ...schedule,
-      id: getNewId(schedules)
+      id: newId,
+      ...scheduleData
     };
     schedules.push(newSchedule);
     
     // Update class schedule
-    const classItem = classes.find(c => c.id === schedule.classId);
+    const classItem = classes.find(c => c.id === scheduleData.classId);
     if (classItem) {
       classItem.schedule.push(newSchedule);
     }
@@ -198,8 +181,9 @@ export const schedulesApi = {
   
   update: (id: number, scheduleData: Partial<ClassSchedule>): Promise<ClassSchedule | undefined> => {
     const index = schedules.findIndex(s => s.id === id);
-    if (index === -1) return Promise.resolve(undefined);
-    
+    if (index === -1) {
+      return Promise.resolve(undefined);
+    }
     const updatedSchedule = { ...schedules[index], ...scheduleData };
     schedules[index] = updatedSchedule;
     
@@ -216,30 +200,44 @@ export const schedulesApi = {
   },
   
   delete: (id: number): Promise<boolean> => {
-    const initialLength = schedules.length;
-    const scheduleIndex = schedules.findIndex(s => s.id === id);
-    
-    if (scheduleIndex !== -1) {
-      const classId = schedules[scheduleIndex].classId;
-      schedules.splice(scheduleIndex, 1);
-      
-      // Remove schedule from class
-      const classItem = classes.find(c => c.id === classId);
-      if (classItem) {
-        const classScheduleIndex = classItem.schedule.findIndex(s => s.id === id);
-        if (classScheduleIndex !== -1) {
-          classItem.schedule.splice(classScheduleIndex, 1);
-        }
-      }
+    const index = schedules.findIndex(s => s.id === id);
+    if (index === -1) {
+      return Promise.resolve(false);
     }
-    
-    return Promise.resolve(schedules.length < initialLength);
+    schedules.splice(index, 1);
+    return Promise.resolve(true);
   }
 };
 
 // Dashboard API
 export const dashboardApi = {
   getStats: (): Promise<Stats> => {
-    return Promise.resolve(getDashboardStats());
+    // Get upcoming schedules (next 7 days)
+    const now = new Date();
+    const oneWeekLater = new Date();
+    oneWeekLater.setDate(now.getDate() + 7);
+
+    const upcomingClasses = schedules.filter(schedule => {
+      const startDate = new Date(schedule.startDate);
+      return startDate >= now && startDate <= oneWeekLater;
+    });
+
+    const statsData: Stats = {
+      totalClasses: classes.length,
+      totalStudents: students.length,
+      totalCoaches: coaches.length,
+      upcomingClasses
+    };
+
+    return Promise.resolve(statsData);
   }
+};
+
+// Export all APIs
+export default {
+  studentsApi,
+  coachesApi,
+  classesApi,
+  schedulesApi,
+  dashboardApi
 }; 

@@ -1,4 +1,4 @@
-import { Student, Teacher, Class, ClassSchedule } from '../../types';
+import { Student, Coach, Class, ClassSchedule } from '../../types';
 
 // Mock Students Data
 export const students: Student[] = [
@@ -49,8 +49,8 @@ export const students: Student[] = [
   }
 ];
 
-// Mock Teachers Data
-export const teachers: Teacher[] = [
+// Mock Coaches Data
+export const coaches: Coach[] = [
   {
     id: 1,
     firstName: 'David',
@@ -89,7 +89,7 @@ export const classes: Class[] = [
     id: 1,
     name: 'Algebra 101',
     description: 'Introduction to Algebra',
-    teacherId: 1,
+    coachId: 1,
     studentIds: [1, 3],
     schedule: [],
     capacity: 20,
@@ -99,7 +99,7 @@ export const classes: Class[] = [
     id: 2,
     name: 'Physics Fundamentals',
     description: 'Basic principles of physics',
-    teacherId: 2,
+    coachId: 2,
     studentIds: [2, 3, 5],
     schedule: [],
     capacity: 15,
@@ -109,7 +109,7 @@ export const classes: Class[] = [
     id: 3,
     name: 'Calculus Advanced',
     description: 'Advanced calculus techniques',
-    teacherId: 1,
+    coachId: 1,
     studentIds: [1, 4],
     schedule: [],
     capacity: 12,
@@ -119,7 +119,7 @@ export const classes: Class[] = [
     id: 4,
     name: 'Literature & Composition',
     description: 'English literature and writing',
-    teacherId: 3,
+    coachId: 3,
     studentIds: [2, 4, 5],
     schedule: [],
     capacity: 25,
@@ -197,7 +197,15 @@ export const getDashboardStats = () => {
   return {
     totalClasses: classes.length,
     totalStudents: students.length,
-    totalTeachers: teachers.length,
+    totalCoaches: coaches.length,
     upcomingClasses: getUpcomingClasses()
   };
+};
+
+// Export stats for direct use
+export const stats = {
+  totalClasses: classes.length,
+  totalStudents: students.length,
+  totalCoaches: coaches.length,
+  upcomingClasses: getUpcomingClasses()
 }; 

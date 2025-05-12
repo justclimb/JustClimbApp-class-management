@@ -8,7 +8,7 @@ export interface Student {
   classes: number[]; // Array of class IDs
 }
 
-export interface Teacher {
+export interface Coach {
   id: number;
   firstName: string;
   lastName: string;
@@ -23,7 +23,7 @@ export interface Class {
   id: number;
   name: string;
   description: string;
-  teacherId: number;
+  coachId: number;
   studentIds: number[];
   schedule: ClassSchedule[];
   capacity: number;
@@ -43,6 +43,6 @@ export interface ClassSchedule {
 export interface Stats {
   totalClasses: number;
   totalStudents: number;
-  totalTeachers: number;
+  totalCoaches: number;
   upcomingClasses: ClassSchedule[];
 } 

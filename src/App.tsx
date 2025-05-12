@@ -1,38 +1,41 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Container, CssBaseline, Box } from '@mui/material';
+import { ThemeProvider, CssBaseline, createTheme, Box, Toolbar } from '@mui/material';
 import './App.css';
 
 // Pages
-import Dashboard from './pages/Dashboard';
+import DashboardPage from './pages/Dashboard';
 import ClassesPage from './pages/Classes';
 import SchedulePage from './pages/Schedule';
 import StudentsPage from './pages/Students';
-import TeachersPage from './pages/Teachers';
+import CoachesPage from './pages/Coaches';
 
 // Components
 import Navigation from './components/Navigation';
 
+const theme = createTheme();
+
 function App() {
   return (
-    <Router>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex' }}>
-        <Navigation />
-        <Box component="main" sx={{ flexGrow: 1, p: 3, marginTop: '64px' }}>
-          <Container maxWidth="lg">
+      <Router>
+        <Box sx={{ display: 'flex' }}>
+          <Navigation />
+          <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: 'calc(100% - 240px)' } }}>
+            <Toolbar />
             <Routes>
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/classes" element={<ClassesPage />} />
               <Route path="/schedule" element={<SchedulePage />} />
               <Route path="/students" element={<StudentsPage />} />
-              <Route path="/teachers" element={<TeachersPage />} />
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/coaches" element={<CoachesPage />} />
             </Routes>
-          </Container>
+          </Box>
         </Box>
-      </Box>
-    </Router>
+      </Router>
+    </ThemeProvider>
   );
 }
 

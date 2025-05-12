@@ -19,7 +19,7 @@ import {
   Class as ClassIcon,
   Schedule as ScheduleIcon,
   Person as StudentIcon,
-  School as TeacherIcon
+  School as CoachIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -35,7 +35,7 @@ const navigationItems: NavigationItem[] = [
   { text: 'Classes', icon: <ClassIcon />, path: '/classes' },
   { text: 'Schedule', icon: <ScheduleIcon />, path: '/schedule' },
   { text: 'Students', icon: <StudentIcon />, path: '/students' },
-  { text: 'Teachers', icon: <TeacherIcon />, path: '/teachers' }
+  { text: 'Coaches', icon: <CoachIcon />, path: '/coaches' }
 ];
 
 const Navigation: React.FC = () => {
