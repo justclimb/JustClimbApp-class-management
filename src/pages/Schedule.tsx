@@ -16,6 +16,9 @@ import {
   EditRecurrenceMenu,
   Resources,
   GroupingPanel,
+  DragDropProvider,
+  AllDayPanel,
+  CurrentTimeIndicator,
 } from '@devexpress/dx-react-scheduler-material-ui';
 import {
   ViewState,
@@ -25,6 +28,7 @@ import {
   IntegratedGrouping,
   AppointmentModel,
   ChangeSet,
+  DragDropProvider as DragDropProviderCore,
 } from '@devexpress/dx-react-scheduler';
 import { schedulesApi, classesApi, coachesApi } from '../services/api';
 import { ClassSchedule, Class, Coach } from '../types';
@@ -637,6 +641,15 @@ const SchedulePage: React.FC = () => {
               <GroupingPanel />
             </>
           )}
+          
+          {/* Add support for drag-and-drop */}
+          <DragDropProvider />
+          
+          {/* Show current time indicator */}
+          <CurrentTimeIndicator updateInterval={60000} />
+          
+          {/* Support for all-day appointments */}
+          <AllDayPanel />
           
           {/* Appointments should come after Resources for proper rendering */}
           <Appointments appointmentComponent={Appointment} />
