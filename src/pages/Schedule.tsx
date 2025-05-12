@@ -615,24 +615,31 @@ const SchedulePage: React.FC = () => {
           <TodayButton />
           <ViewSwitcher />
           
-          <Appointments appointmentComponent={Appointment} />
-          
-          {/* Always provide a default empty array for Resources when no data is available */}
+          {/* Resources must come before GroupingState */}
           <Resources
-            data={resources || []}
+            data={resources || [{ 
+              fieldName: 'coachId',
+              title: 'Coach',
+              instances: [{ id: 0, text: 'No Coaches Available' }],
+              allowMultiple: false,
+            }]}
           />
           
-          {/* GroupingState must come before IntegratedGrouping and GroupingPanel */}
+          {/* GroupingState must be defined regardless of groupByCoach state */}
           <GroupingState
             grouping={groupByCoach ? [{ resourceName: 'coachId' }] : []}
           />
 
+          {/* These components require GroupingState to be defined first */}
           {groupByCoach && (
             <>
               <IntegratedGrouping />
               <GroupingPanel />
             </>
           )}
+          
+          {/* Appointments should come after Resources for proper rendering */}
+          <Appointments appointmentComponent={Appointment} />
           
           <EditRecurrenceMenu />
           <ConfirmationDialog />
